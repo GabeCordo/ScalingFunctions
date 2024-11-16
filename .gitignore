@@ -17,6 +17,3 @@ build/
 
 # Goland dependencies (pulling will throw an error if this is being tracked)
 .idea/
-
-# swagger
-docs/
