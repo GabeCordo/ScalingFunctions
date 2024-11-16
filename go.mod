@@ -1,4 +1,4 @@
-module github.com/Sentmint/Yule
+module github.com/Sentmint/yule
 
 go 1.20
 
