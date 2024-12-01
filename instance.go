@@ -161,6 +161,10 @@ func (instance *runInstance) Start() error {
 
 	defer instance.Event(TearedDown)
 
+	if DEBUG {
+		log.Printf("Starting instance with id: %d", instance.Id)
+	}
+
 	var err error = nil
 
 	defer func() {
@@ -175,6 +179,11 @@ func (instance *runInstance) Start() error {
 
 	if instance.Pipeline.OnStartup != nil {
 		// TODO : add safety check here
+
+		if DEBUG {
+			log.Println("Running OnStartup function")
+		}
+
 		f := reflect.ValueOf(instance.Pipeline.OnStartup.Value)
 		f.Call([]reflect.Value{})
 	}
@@ -183,6 +192,10 @@ func (instance *runInstance) Start() error {
 
 	// TODO : possibly enhance security?
 	for key, value := range instance.metadata {
+
+		if DEBUG {
+			log.Printf("added new environment value '%s'\n", key)
+		}
 		os.Setenv(key, value)
 	}
 
@@ -211,6 +224,10 @@ func (instance *runInstance) Start() error {
 	//// cleanup environment variables that were dynamically set
 
 	for key, _ := range instance.metadata {
+
+		if DEBUG {
+			log.Printf("deleted environment value '%s'\n", key)
+		}
 		os.Unsetenv(key)
 	}
 
@@ -411,6 +428,10 @@ func (instance *runInstance) Provision(function *pFunction) {
 
 			function.To.Value.AddProducer()
 
+			if DEBUG {
+				log.Printf("creating new producer function %d\n", supervisor.Id)
+			}
+
 			// TODO : reword
 			// if the producer function has output, then don't worry about spawning a wrapper,
 			// allow the function to return normally and send the data along the pipe
@@ -451,6 +472,10 @@ func (instance *runInstance) Provision(function *pFunction) {
 					supervisor.waitGroup.Done()
 				}
 			}()
+
+			if DEBUG {
+				log.Printf("creating new endpoint function %d\n", supervisor.Id)
+			}
 
 			var queuedRequests reflect.Value
 			if function.Config.WaitBefore {
@@ -519,6 +544,10 @@ func (instance *runInstance) Provision(function *pFunction) {
 			function.Mutex.Unlock()
 
 			function.To.Value.AddProducer()
+
+			if DEBUG {
+				log.Printf("creating new transformer function %d\n", supervisor.Id)
+			}
 
 			var queuedRequests reflect.Value
 			if function.Config.WaitBefore {
@@ -667,6 +696,4 @@ func (instance *runInstance) Deletable() bool {
 
 func (instance *runInstance) Print() {
 	fmt.Printf("Id: %d\n", instance.Id)
-	// TODO : fix
-	//fmt.Printf("Function: %s\n", instance.Pipeline)
 }

@@ -15,6 +15,10 @@ type Metadata struct {
 	Functions  []F
 }
 
+func (m *Metadata) ToRunnable() *Runnable {
+	return NewRunnable(m)
+}
+
 // A1 ---> B -> C
 // A2 _/
 
@@ -101,6 +105,16 @@ func Build(branches ...*Branch) *Metadata {
 	}
 
 	return metadata
+}
+
+func BuildLinear(functions ...any) *Metadata {
+
+	branch := NewBranch()
+	for _, function := range functions {
+		branch.Add(function)
+	}
+
+	return Build(branch)
 }
 
 func BuildFrom(deployment *Deployment, repository *Repository) *Metadata {
