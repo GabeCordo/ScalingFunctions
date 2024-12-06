@@ -1,11 +1,16 @@
 package yule
 
+import (
+	"reflect"
+	"sync"
+)
+
 type Runnable struct {
 	pipeline *Pipeline
 	metadata *Metadata
 }
 
-func NewRunnable(metadata *Metadata) *Runnable {
+func newRunnable(metadata *Metadata) *Runnable {
 
 	runnable := new(Runnable)
 	runnable.metadata = metadata
@@ -47,6 +52,8 @@ func NewRunnable(metadata *Metadata) *Runnable {
 		function.Stats = &runnable.pipeline.Stats.Functions[i]
 		function.Quit = make([]chan bool, 0)
 		function.Value = metadata.Functions[i].value
+		function.Reflected.Value = reflect.ValueOf(function.Value)
+		function.Reflected.Type = reflect.TypeOf(function.Value)
 
 		function.To = nil
 		function.From = nil
@@ -84,7 +91,7 @@ func NewRunnable(metadata *Metadata) *Runnable {
 	return runnable
 }
 
-func (runnable *Runnable) Run(metadata ...map[string]string) error {
+func (runnable *Runnable) RunWithMetadata(metadata ...map[string]string) error {
 
 	var m map[string]string
 	if len(metadata) == 0 {
@@ -93,6 +100,45 @@ func (runnable *Runnable) Run(metadata ...map[string]string) error {
 		m = metadata[0]
 	}
 
-	instance := NewInstance(runnable.pipeline, m)
-	return instance.Start()
+	instance := newInstance(runnable.pipeline, m)
+	return instance.Start(false)
+}
+
+func (runnable *Runnable) Run(injectables ...any) error {
+
+	m := make(map[string]string)
+	instance := newInstance(runnable.pipeline, m, injectables...)
+	return instance.Start(false)
+}
+
+func (runnable *Runnable) Snapshot() *Statistics {
+
+	return runnable.pipeline.Stats
+}
+
+type TestReport struct {
+	Success     bool   `json:"success"`
+	FailedStep  int    `json:"step"`
+	FailedCause string `json:"cause"`
+}
+
+func (runnable *Runnable) Test(data any, injectables ...any) TestReport {
+
+	m := make(map[string]string)
+	instance := newInstance(runnable.pipeline, m, injectables...)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		instance.Start(true)
+		wg.Done()
+	}()
+
+	instance.send(data)
+	instance.close()
+
+	wg.Wait()
+
+	return TestReport{}
 }

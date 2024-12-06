@@ -11,16 +11,14 @@ import (
 )
 
 const (
-	DefaultNumberOfClusters       = 1
-	DefaultMonitorRefreshDuration = 100
-	DefaultChannelThreshold       = 10
-	DefaultChannelGrowthFactor    = 2
+	defaultMonitorRefreshDuration = 100
 )
 
 type runStatus string
 
 const (
 	UnTouched    runStatus = "untouched"
+	Starting               = "starting"
 	Active                 = "active"
 	Provisioning           = "provisioning"
 	Failed                 = "failed"
@@ -33,6 +31,8 @@ func (status runStatus) ToString() string {
 	switch status {
 	case UnTouched:
 		return "UnTouched"
+	case Starting:
+		return "Setup"
 	case Active:
 		return "Active"
 	case Provisioning:
@@ -50,6 +50,7 @@ type runEvent uint8
 
 const (
 	Startup runEvent = iota
+	Ready
 	StartProvision
 	EndProvision
 	Error
@@ -57,6 +58,13 @@ const (
 	TearedDown
 	StartReport
 	EndReport
+)
+
+type functionTerminationCause uint8
+
+const (
+	Complete functionTerminationCause = iota
+	Forced
 )
 
 const MaximumRoutinesPerSupervisor = 2000
@@ -67,16 +75,20 @@ type runInstance struct {
 	State     runStatus `json:"status"`
 	StartTime time.Time `json:"quitE-time"`
 
-	Pipeline *Pipeline
-	metadata map[string]string
+	Pipeline    *Pipeline
+	metadata    map[string]string
+	injectables []reflect.Value
 
-	loadWaitGroup sync.WaitGroup
-	waitGroup     sync.WaitGroup
-	threadMutex   sync.Mutex
-	mutex         sync.RWMutex
+	testing bool
+
+	startingWaitGroup sync.WaitGroup
+	loadWaitGroup     sync.WaitGroup
+	waitGroup         sync.WaitGroup
+	threadMutex       sync.Mutex
+	mutex             sync.RWMutex
 }
 
-func NewInstance(pipeline *Pipeline, metadata map[string]string) *runInstance {
+func newInstance(pipeline *Pipeline, metadata map[string]string, injectables ...any) *runInstance {
 	supervisor := new(runInstance)
 
 	/**
@@ -90,6 +102,13 @@ func NewInstance(pipeline *Pipeline, metadata map[string]string) *runInstance {
 
 	supervisor.Pipeline = pipeline
 	supervisor.metadata = metadata
+
+	supervisor.injectables = make([]reflect.Value, len(injectables))
+	for idx, injectable := range injectables {
+		supervisor.injectables[idx] = reflect.ValueOf(injectable)
+	}
+
+	supervisor.startingWaitGroup.Add(1)
 
 	return supervisor
 }
@@ -156,10 +175,12 @@ func (instance *runInstance) IsAlive() bool {
 	return (instance.State != Failed) && (instance.State != Terminated)
 }
 
-func (instance *runInstance) Start() error {
+func (instance *runInstance) Start(test bool) error {
 	instance.Event(Startup)
 
 	defer instance.Event(TearedDown)
+
+	instance.testing = test
 
 	if DEBUG {
 		log.Printf("Starting instance with id: %d", instance.Id)
@@ -185,7 +206,7 @@ func (instance *runInstance) Start() error {
 		}
 
 		f := reflect.ValueOf(instance.Pipeline.OnStartup.Value)
-		f.Call([]reflect.Value{})
+		f.Call(instance.injectables)
 	}
 
 	//// add all the metadata passed to the pipeline to the local environment
@@ -215,7 +236,8 @@ func (instance *runInstance) Start() error {
 	// and requires us to provision additional nodes
 	go instance.Runtime()
 
-	instance.waitGroup.Wait() // wait for the Extract-Transform-Load (ETL) Cycle to Complete
+	instance.startingWaitGroup.Done() // allow actions that need to wait for startup to begin
+	instance.waitGroup.Wait()         // wait for the Extract-Transform-Load (ETL) Cycle to Complete
 
 	// calculate the timings produced by data being fed across each of the channels
 	// TODO: support
@@ -239,7 +261,7 @@ func (instance *runInstance) Teardown() {
 	// TODO : add a guard in case this value is not a function
 	if instance.Pipeline.OnStartup != nil {
 		f := reflect.ValueOf(instance.Pipeline.OnTeardown.Value)
-		f.Call([]reflect.Value{})
+		f.Call(instance.injectables)
 	}
 
 	instance.Event(Suspend)
@@ -291,12 +313,12 @@ func (instance *runInstance) Runtime() {
 			}
 		}
 
-		// check if the channel is congested after DefaultMonitorRefreshDuration seconds
-		time.Sleep(DefaultMonitorRefreshDuration * time.Millisecond)
+		// check if the channel is congested after defaultMonitorRefreshDuration seconds
+		time.Sleep(defaultMonitorRefreshDuration * time.Millisecond)
 	}
 }
 
-func (instance *runInstance) ExtractWrapper(function any, channel *managedChannel) <-chan struct{} {
+func (instance *runInstance) ExtractWrapper(function *pFunction, channel *managedChannel) <-chan struct{} {
 	done := make(chan struct{})
 
 	// the function always finishes till completion unless a direct shutdown is called on the server
@@ -307,25 +329,32 @@ func (instance *runInstance) ExtractWrapper(function any, channel *managedChanne
 			close(done)
 		}()
 
-		arguments := make([]reflect.Value, 0)
+		numOfInjectibles := len(instance.injectables)
+		arguments := make([]reflect.Value, numOfInjectibles)
+		copy(arguments, instance.injectables)
 
-		if reflect.TypeOf(function).NumIn() > 0 {
+		// the first parameter of an extract function that is not an injectable
+		// shall be a channel that the function can push extracted data to
+		if (function.Reflected.Type.NumIn() - numOfInjectibles) > 0 {
 
 			// do we expect to pass a pipe?
-			channelType := reflect.TypeOf(function).In(0)
+			channelType := function.Reflected.Type.In(numOfInjectibles)
 
 			if channelType.Kind() == reflect.Chan {
-				channel := reflect.MakeChan(channelType, 0)
-				arguments = append(arguments, channel)
+				c := reflect.MakeChan(channelType, numOfInjectibles)
+				arguments = append(arguments, c)
 			}
 		}
 
-		go reflect.ValueOf(function).Call(arguments)
+		go function.Reflected.Value.Call(arguments)
 
-		if reflect.TypeOf(function).NumIn() > 0 {
+		// as the extract function runs asynchronously and sends data to the
+		// channel, receive data from the channel and push data to the next
+		// function in the pipeline sequence.
+		if (function.Reflected.Type.NumIn() - numOfInjectibles) > 0 {
 
 			for {
-				value, ok := arguments[0].Recv()
+				value, ok := arguments[numOfInjectibles].Recv()
 				if ok {
 					channel.Push([]reflect.Value{value})
 				} else {
@@ -364,10 +393,14 @@ var errorInterface = reflect.TypeOf((*error)(nil)).Elem()
 // error values. if the function returns an error that is non-nil we will set
 // the returned boolean flag to true indicating something may have gone wrong
 // inside the function call.
-func (instance *runInstance) Call(function *pFunction, in []reflect.Value) ([]reflect.Value, bool) {
+func (instance *runInstance) Call(function *pFunction, ins []reflect.Value) ([]reflect.Value, bool) {
 
 	drop := false
-	results := reflect.ValueOf(function.Value).Call(in)
+
+	// append the values given to the function on-top of the injectables that need to
+	// be passed to every step in the pipeline
+	arguments := append(instance.injectables, ins...)
+	results := function.Reflected.Value.Call(arguments)
 
 	// TODO : the number of results returned by a function can be pre-computed
 	numResults := len(results)
@@ -412,6 +445,10 @@ func (instance *runInstance) Provision(function *pFunction) {
 	instance.threadMutex.Lock()
 	defer instance.threadMutex.Unlock()
 
+	// a new function is provisioned
+	// we should inform the wait group that the runner isn't finished until the wg is done
+	instance.waitGroup.Add(1)
+
 	go func(supervisor *runInstance, function *pFunction) {
 
 		if (function.From == nil) && (function.To != nil) {
@@ -426,6 +463,12 @@ func (instance *runInstance) Provision(function *pFunction) {
 				}
 			}()
 
+			// support passing values to the pipeline manually
+			// todo : add more description
+			if instance.testing {
+				return
+			}
+
 			function.To.Value.AddProducer()
 
 			if DEBUG {
@@ -436,15 +479,15 @@ func (instance *runInstance) Provision(function *pFunction) {
 			// if the producer function has output, then don't worry about spawning a wrapper,
 			// allow the function to return normally and send the data along the pipe
 
-			if reflect.TypeOf(function.Value).NumOut() > 0 {
+			if function.Reflected.Type.NumOut() > 0 {
 
-				output := reflect.ValueOf(function.Value).Call([]reflect.Value{})
+				output := function.Reflected.Value.Call(instance.injectables)
 				function.To.Value.Push(output)
 
 			} else {
 
 				select {
-				case <-supervisor.ExtractWrapper(function.Value, function.To.Value):
+				case <-supervisor.ExtractWrapper(function, function.To.Value):
 					break
 				case <-supervisor.ExtractShutdownWrapper():
 					fmt.Println("shutdown caused extract to finish early")
@@ -452,11 +495,14 @@ func (instance *runInstance) Provision(function *pFunction) {
 				}
 			}
 
+			function.Mutex.Lock()
+			function.Stats.Active--
+			function.Mutex.Unlock()
+
 			// if the number of producers is 0, the ET channel will close that
 			// allows the Transform goroutines to terminate once they have
 			// completed processing all of their data
 			function.To.Value.ProducerDone()
-			fmt.Println(function.To.Value.ChannelFinished)
 		} else if (function.From != nil) && (function.To == nil) {
 			// the function is an ENDPOINT NODE of the Pipeline if no data is being sent
 
@@ -479,10 +525,11 @@ func (instance *runInstance) Provision(function *pFunction) {
 
 			var queuedRequests reflect.Value
 			if function.Config.WaitBefore {
-				in := reflect.TypeOf(function.Value).In(0)
+				in := function.Reflected.Type.In(0)
 				queuedRequests = reflect.MakeSlice(in, 0, 0)
 			}
 			closeChan := false
+			terminationCause := Complete
 
 			for {
 				select {
@@ -508,21 +555,30 @@ func (instance *runInstance) Provision(function *pFunction) {
 						if function.Config.WaitBefore {
 							queuedRequests = reflect.Append(queuedRequests, request.Data[0])
 						} else {
-							reflect.ValueOf(function.Value).Call(request.Data)
+							arguments := append(instance.injectables, request.Data...)
+							function.Reflected.Value.Call(arguments)
 						}
 					}
 				case <-quit:
 					{
+						terminationCause = Forced
 						closeChan = true
 					}
 				}
 
 				if closeChan {
 
+					if terminationCause == Complete {
+						function.Mutex.Lock()
+						function.Stats.Active--
+						function.Mutex.Unlock()
+					}
+
 					// if we were waiting for the channel to close before transforming the data,
 					// call the function now that the channel is closed
 					if function.Config.WaitBefore {
-						reflect.ValueOf(function.Value).Call([]reflect.Value{queuedRequests})
+						arguments := append(instance.injectables, queuedRequests)
+						function.Reflected.Value.Call(arguments)
 					}
 
 					break
@@ -551,10 +607,11 @@ func (instance *runInstance) Provision(function *pFunction) {
 
 			var queuedRequests reflect.Value
 			if function.Config.WaitBefore {
-				in := reflect.TypeOf(function.Value).In(0)
+				in := function.Reflected.Type.In(0)
 				queuedRequests = reflect.MakeSlice(in, 0, 0)
 			}
 			closeChan := false
+			terminationCause := Complete
 
 			for {
 				select {
@@ -600,7 +657,7 @@ func (instance *runInstance) Provision(function *pFunction) {
 									//		 this is a safety guard if something goes wrong
 									if len(function.To.Receiver) > 0 {
 										nextFunction := function.To.Receiver[0]
-										nextFunctionReflection := reflect.TypeOf(nextFunction.Value)
+										nextFunctionReflection := nextFunction.Reflected.Type
 
 										// note: the value should accept some value or the pipeline we've provisioned
 										// 		 is invalid and should have been rejected prior to this step
@@ -637,11 +694,18 @@ func (instance *runInstance) Provision(function *pFunction) {
 					}
 				case <-quit:
 					{
+						terminationCause = Forced
 						closeChan = true
 					}
 				}
 
 				if closeChan {
+
+					if terminationCause == Complete {
+						function.Mutex.Lock()
+						function.Stats.Active--
+						function.Mutex.Unlock()
+					}
 
 					// if we were waiting for the channel to close before transforming the data,
 					// call the function now that the channel is closed
@@ -666,17 +730,12 @@ func (instance *runInstance) Provision(function *pFunction) {
 			// completed processing all of their data
 			function.To.Value.ProducerDone()
 		} else {
-			// todo: clean up
-			fmt.Println("not good")
+			panic("function is neither a producer or receiver of data")
 		}
 
 		// notify the wait group a process has completed ~ if all are finished we close the monitor
 		supervisor.waitGroup.Done()
 	}(instance, function)
-
-	// a new function is provisioned
-	// we should inform the wait group that the runner isn't finished until the wg is done
-	instance.waitGroup.Add(1)
 }
 
 func (instance *runInstance) Remove(function *pFunction) {
@@ -688,6 +747,27 @@ func (instance *runInstance) Remove(function *pFunction) {
 	quit := function.Quit[0]
 	function.Quit = function.Quit[1:]
 	quit <- true
+}
+
+func (instance *runInstance) send(data any) {
+
+	instance.startingWaitGroup.Wait()
+
+	for _, f := range instance.Pipeline.Roots {
+		f.To.Value.AddProducer()
+		f.To.Value.Push([]reflect.Value{reflect.ValueOf(data)})
+	}
+}
+
+func (instance *runInstance) close() {
+
+	instance.startingWaitGroup.Wait()
+
+	for _, f := range instance.Pipeline.Roots {
+		f.Stats.Active--
+		f.To.Value.ProducerDone()
+		instance.waitGroup.Done()
+	}
 }
 
 func (instance *runInstance) Deletable() bool {

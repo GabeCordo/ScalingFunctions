@@ -64,11 +64,11 @@ func TestBuildFrom(t *testing.T) {
 		"prt": prt,
 	})
 
-	NewRunnable(BuildFrom(&d, r)).Run()
+	newRunnable(BuildFrom(&d, r)).Run()
 }
 
 func TestBranchRun(t *testing.T) {
 
 	b := NewBranch().Add(gen).Add(mul).Add(prt)
-	NewRunnable(Build(b)).Run()
+	newRunnable(Build(b)).Run()
 }

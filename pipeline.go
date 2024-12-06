@@ -1,6 +1,7 @@
 package yule
 
 import (
+	"reflect"
 	"sync"
 )
 
@@ -25,7 +26,12 @@ type pFunction struct {
 	From       *pChannel
 	Stats      *FunctionStatistic `json:"-"`
 	Quit       []chan bool        `json:"-"`
-	Value      any                `json:"-"`
+
+	Value     any `json:"-"`
+	Reflected struct {
+		Value reflect.Value
+		Type  reflect.Type
+	} `json:"-"`
 
 	Config struct {
 		StartWith  int
