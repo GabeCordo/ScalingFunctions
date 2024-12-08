@@ -64,11 +64,27 @@ func TestBuildFrom(t *testing.T) {
 		"prt": prt,
 	})
 
-	newRunnable(BuildFrom(&d, r)).Run()
+	Build(&d, r).Run()
 }
 
 func TestBranchRun(t *testing.T) {
 
 	b := NewBranch().Add(gen).Add(mul).Add(prt)
-	newRunnable(Build(b)).Run()
+	Build(b).Run()
+}
+
+func TestBranchWrapperRun(t *testing.T) {
+
+	b := NewBranch().Add(F{"extract", gen}).Add(F{"transform", mul}).Add(F{"load", prt})
+	Build(b).Run()
+}
+
+func TestFunctionRun(t *testing.T) {
+
+	Build(gen, mul, prt).Run()
+}
+
+func TestFunctionWrapperRun(t *testing.T) {
+
+	Build(F{"extract", gen}, F{"transform", mul}, F{"load", prt}).Run()
 }

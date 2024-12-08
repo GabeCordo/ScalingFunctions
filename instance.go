@@ -79,7 +79,8 @@ type runInstance struct {
 	metadata    map[string]string
 	injectables []reflect.Value
 
-	testing bool
+	testing       bool
+	testingReport TestReport
 
 	startingWaitGroup sync.WaitGroup
 	loadWaitGroup     sync.WaitGroup
@@ -425,6 +426,11 @@ func (instance *runInstance) Call(function *pFunction, ins []reflect.Value) ([]r
 			isNil := lastResult.IsNil()
 
 			if !isNil {
+				if instance.testing {
+					instance.testingReport.Success = false
+					instance.testingReport.Step = function.Identifier
+					instance.testingReport.Cause = lastResult.Interface().(error)
+				}
 				drop = true
 			}
 
@@ -456,8 +462,14 @@ func (instance *runInstance) Provision(function *pFunction) {
 
 			defer func() {
 				if r := recover(); r != nil {
-					log.Println(r)
-					log.Println("cluster.Extract function raised error")
+					out := fmt.Sprintf("cluster.Extract function raised error: %v", r)
+					err := errors.New(out)
+					if instance.testing {
+						instance.testingReport.Success = false
+						instance.testingReport.Step = function.Identifier
+						instance.testingReport.Cause = err
+					}
+					log.Println(err)
 					function.To.Value.ProducerDone()
 					supervisor.waitGroup.Done()
 				}
@@ -513,8 +525,14 @@ func (instance *runInstance) Provision(function *pFunction) {
 
 			defer func() {
 				if r := recover(); r != nil {
-					log.Println(r)
-					log.Println("cluster.Load function raised error")
+					out := fmt.Sprintf("cluster.Load function raised error: %v", r)
+					err := errors.New(out)
+					if instance.testing {
+						instance.testingReport.Success = false
+						instance.testingReport.Step = function.Identifier
+						instance.testingReport.Cause = err
+					}
+					log.Println(err)
 					supervisor.waitGroup.Done()
 				}
 			}()
@@ -587,8 +605,14 @@ func (instance *runInstance) Provision(function *pFunction) {
 		} else if (function.From != nil) && (function.To != nil) {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Println("cluster.Transform function raised error")
-					log.Println(r)
+					out := fmt.Sprintf("cluster.Transform function raised error: %v", r)
+					err := errors.New(out)
+					if instance.testing {
+						instance.testingReport.Success = false
+						instance.testingReport.Step = function.Identifier
+						instance.testingReport.Cause = err
+					}
+					log.Println(err)
 					function.To.Value.ProducerDone()
 					supervisor.waitGroup.Done()
 				}
@@ -749,13 +773,35 @@ func (instance *runInstance) Remove(function *pFunction) {
 	quit <- true
 }
 
-func (instance *runInstance) send(data any) {
+func (instance *runInstance) send(data any, functionId ...string) {
+
+	specifiedFunction := len(functionId) > 0
+
+	// the developer needs to specify which root they want to mimic
+	// when the pipeline's topology is more complex than a linear line
+	if !specifiedFunction && (len(instance.Pipeline.Roots) > 1) {
+		panic("testing non-linear pipelines requires specifying which generator function is being stubbed")
+	}
 
 	instance.startingWaitGroup.Wait()
+	instance.testingReport.Success = true
 
+	isDataSent := false
 	for _, f := range instance.Pipeline.Roots {
+
+		// do not push data to the pipeline when the function identifier is
+		// specified and does not match.
+		if specifiedFunction && (f.Identifier != functionId[0]) {
+			continue
+		}
 		f.To.Value.AddProducer()
 		f.To.Value.Push([]reflect.Value{reflect.ValueOf(data)})
+
+		isDataSent = true
+	}
+
+	if !isDataSent {
+		panic("attempt to test the pipeline failed, could not find a pipeline to push data to")
 	}
 }
 

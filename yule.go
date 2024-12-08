@@ -7,8 +7,8 @@ import (
 )
 
 type F struct {
-	name  string
-	value any
+	Id    string
+	Value any
 }
 
 // Metadata
@@ -61,7 +61,12 @@ func build(branches ...*Branch) *Runnable {
 				panic("repeated function must be at the end of the branch")
 			}
 
-			f := Function{Identifier: fmt.Sprint(sid), StartWith: 1}
+			f := Function{StartWith: 1}
+			if step.id != "" {
+				f.Identifier = step.id
+			} else {
+				step.id = fmt.Sprint(sid)
+			}
 			f.From = previousPipe
 
 			// if the function is not a terminal step we will need to create a channel
@@ -90,7 +95,7 @@ func build(branches ...*Branch) *Runnable {
 
 			// add the built function //
 			deployment.Functions = append(deployment.Functions, f)
-			metadata.Functions = append(metadata.Functions, F{value: step.value})
+			metadata.Functions = append(metadata.Functions, F{Value: step.value, Id: step.id})
 			functions[sid] = f
 		}
 
@@ -110,7 +115,6 @@ func buildLinear(functions ...any) *Runnable {
 	for _, function := range functions {
 		branch.Add(function)
 	}
-
 	return build(branch)
 }
 
@@ -129,7 +133,7 @@ func buildFrom(deployment *Deployment, repository *Repository) *Runnable {
 		if m, found := repository.modules[function.Module]; found {
 
 			if f, found := m.functions[function.Identifier]; found {
-				metadata.Functions = append(metadata.Functions, F{value: f.value})
+				metadata.Functions = append(metadata.Functions, F{Value: f.Value})
 			} else {
 				// TODO : add more description
 				panic("function module not found")
@@ -149,6 +153,7 @@ type notableType uint8
 
 const (
 	functionType notableType = iota
+	functionWrapperType
 	branchType
 	deploymentType
 	repositoryType
@@ -161,6 +166,7 @@ type buildVariant uint8
 
 const (
 	functionVariant buildVariant = iota
+	functionWrapperVariant
 	branchVariant
 	configVariant
 	invalidVariant
@@ -184,6 +190,8 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 			iType = repositoryType
 		} else if _, ok = input.(*Deployment); ok {
 			iType = deploymentType
+		} else if _, ok = input.(F); ok {
+			iType = functionWrapperType
 		} else if reflect.TypeOf(input).Kind() == reflect.Func {
 			iType = functionType
 		} else {
@@ -196,6 +204,12 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 			{
 				if iType != functionType {
 					log.Panicf("the parameter at index %d is not a function\n", idx)
+				}
+			}
+		case functionWrapperVariant:
+			{
+				if iType != functionWrapperType {
+					log.Panicf("the parameter at index %d is not a function wrapper\n", idx)
 				}
 			}
 		case branchVariant:
@@ -217,6 +231,8 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 					variant = branchVariant
 				case functionType:
 					variant = functionVariant
+				case functionWrapperType:
+					variant = functionWrapperVariant
 				case deploymentType:
 					variant = configVariant
 				case repositoryType:
@@ -246,7 +262,7 @@ func Build(input ...any) (runnable *Runnable) {
 	variant := getBuildVariant(input...)
 
 	switch variant {
-	case functionVariant:
+	case functionVariant, functionWrapperVariant:
 		{
 			runnable = buildLinear(input...)
 		}

@@ -51,7 +51,7 @@ func newRunnable(metadata *Metadata) *Runnable {
 		function.Config.WaitBefore = f.WaitBefore
 		function.Stats = &runnable.pipeline.Stats.Functions[i]
 		function.Quit = make([]chan bool, 0)
-		function.Value = metadata.Functions[i].value
+		function.Value = metadata.Functions[i].Value
 		function.Reflected.Value = reflect.ValueOf(function.Value)
 		function.Reflected.Type = reflect.TypeOf(function.Value)
 
@@ -74,7 +74,7 @@ func newRunnable(metadata *Metadata) *Runnable {
 		}
 
 		if function.From == nil {
-			runnable.pipeline.Roots = append(runnable.pipeline.Tails, function)
+			runnable.pipeline.Roots = append(runnable.pipeline.Roots, function)
 		}
 
 		if function.Identifier == metadata.Deployment.OnStartup {
@@ -117,9 +117,9 @@ func (runnable *Runnable) Snapshot() *Statistics {
 }
 
 type TestReport struct {
-	Success     bool   `json:"success"`
-	FailedStep  int    `json:"step"`
-	FailedCause string `json:"cause"`
+	Success bool   `json:"success"`
+	Step    string `json:"step"`
+	Cause   error  `json:"cause"`
 }
 
 func (runnable *Runnable) Test(data any, injectables ...any) TestReport {
@@ -140,5 +140,26 @@ func (runnable *Runnable) Test(data any, injectables ...any) TestReport {
 
 	wg.Wait()
 
-	return TestReport{}
+	return instance.testingReport
+}
+
+func (runnable *Runnable) TestAs(f string, data any, injectables ...any) TestReport {
+
+	m := make(map[string]string)
+	instance := newInstance(runnable.pipeline, m, injectables...)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		instance.Start(true)
+		wg.Done()
+	}()
+
+	instance.send(data, f)
+	instance.close()
+
+	wg.Wait()
+
+	return instance.testingReport
 }

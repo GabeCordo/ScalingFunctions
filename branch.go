@@ -2,7 +2,6 @@ package yule
 
 import (
 	"errors"
-	"log"
 	"reflect"
 )
 
@@ -29,21 +28,30 @@ type M struct {
 
 // Add
 // allows the developer to define new function steps using the builder pattern.
-func (b *Branch) Add(value any, m ...M) *Branch {
+func (b *Branch) Add(data any) *Branch {
 
-	v := reflect.ValueOf(value)
-	k := v.Kind()
+	var v reflect.Value
+	var k reflect.Kind
+
+	var s Step
+
+	if w, isWrapperType := data.(F); isWrapperType {
+		v = reflect.ValueOf(w.Value)
+		k = v.Kind()
+
+		s.id = w.Id
+		s.value = w.Value
+	} else {
+		v = reflect.ValueOf(data)
+		k = v.Kind()
+
+		s.id = v.String()
+		s.value = data
+	}
 
 	if k != reflect.Func {
 		panic(IsNotFunc)
 	}
-
-	s := Step{value: value}
-
-	if len(m) > 0 {
-		s.id = m[0].id
-	}
-
 	b.steps = append(b.steps, s)
 
 	return b
@@ -63,17 +71,9 @@ func NewBranch() *Branch {
 // is syntactic-sugar function that makes it simpler to define complex pipelines.
 func B(values ...any) *Branch {
 
-	for idx, value := range values {
-		if reflect.TypeOf(value).Kind() != reflect.Func {
-			log.Panicf("value passed to B at index %d is not a function\n", idx)
-		}
-	}
-
-	b := new(Branch)
-
-	b.steps = make([]Step, len(values))
-	for idx, value := range values {
-		b.steps[idx] = Step{value: value}
+	b := NewBranch()
+	for _, v := range values {
+		b.Add(v)
 	}
 
 	return b
