@@ -426,6 +426,11 @@ func (instance *runInstance) Call(function *pFunction, ins []reflect.Value) ([]r
 		if isError {
 			isNil := lastResult.IsNil()
 
+			// the yule framework shall be responsible for displaying errors sent
+			// by the pipeline to avoid requiring the developer to handle and return
+			// the error which is considered an anti-pattern
+			log.Println(lastResult.Elem())
+
 			if !isNil {
 				if instance.testing {
 					instance.testingReport.Success = false
