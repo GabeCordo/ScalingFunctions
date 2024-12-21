@@ -9,6 +9,7 @@ import (
 type F struct {
 	Id    string
 	Value any
+	Max   int
 }
 
 // Metadata
@@ -66,6 +67,12 @@ func build(branches ...*Branch) *Runnable {
 				f.Identifier = step.id
 			} else {
 				step.id = fmt.Sprint(sid)
+				f.Identifier = step.id
+			}
+			if step.max >= 1 {
+				f.Maximum = step.max
+			} else {
+				f.Maximum = 1000000
 			}
 			f.From = previousPipe
 
@@ -95,7 +102,7 @@ func build(branches ...*Branch) *Runnable {
 
 			// add the built function //
 			deployment.Functions = append(deployment.Functions, f)
-			metadata.Functions = append(metadata.Functions, F{Value: step.value, Id: step.id})
+			metadata.Functions = append(metadata.Functions, F{Value: step.value, Id: step.id, Max: step.max})
 			functions[sid] = f
 		}
 

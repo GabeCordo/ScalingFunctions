@@ -36,6 +36,7 @@ type pFunction struct {
 	Config struct {
 		StartWith  int
 		WaitBefore bool
+		Maximum    int
 	} `json:"-"`
 
 	Mutex sync.RWMutex `json:"-"`

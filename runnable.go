@@ -49,6 +49,7 @@ func newRunnable(metadata *Metadata) *Runnable {
 			function.Config.StartWith = 1
 		}
 		function.Config.WaitBefore = f.WaitBefore
+		function.Config.Maximum = f.Maximum
 		function.Stats = &runnable.pipeline.Stats.Functions[i]
 		function.Quit = make([]chan bool, 0)
 		function.Value = metadata.Functions[i].Value

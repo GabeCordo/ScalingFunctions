@@ -12,6 +12,7 @@ var IsNotFunc = errors.New("passed value must be of type function")
 type Step struct {
 	id    string
 	value any
+	max   int
 }
 
 // Branch
@@ -41,12 +42,14 @@ func (b *Branch) Add(data any) *Branch {
 
 		s.id = w.Id
 		s.value = w.Value
+		s.max = w.Max
 	} else {
 		v = reflect.ValueOf(data)
 		k = v.Kind()
 
 		s.id = v.String()
 		s.value = data
+		s.max = -1
 	}
 
 	if k != reflect.Func {

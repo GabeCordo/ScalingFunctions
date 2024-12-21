@@ -25,6 +25,7 @@ type Function struct {
 	To         string `json:"to,omitempty" yaml:"to,omitempty"`                 // which pipe the function is receiving data from.
 	StartWith  int    `json:"start_with,omitempty" yaml:"start_with,omitempty"` // start with N instances of the function running in parallel.
 	WaitBefore bool   `json:"wait_before,omitempty" yaml:"wait_before"`
+	Maximum    int    `json:"maximum,omitempty" yaml:"maximum"` // maximum instances of the function that can be run at the same time
 }
 
 type Pipe struct {

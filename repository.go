@@ -20,7 +20,7 @@ func (module *Module) LinkFunction(name string, value any) error {
 	if _, found := module.functions[name]; found {
 		return errors.New("module already has a function with this name")
 	} else {
-		module.functions[name] = F{name, value}
+		module.functions[name] = F{Id: name, Value: value}
 	}
 
 	return nil

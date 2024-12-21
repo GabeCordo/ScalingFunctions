@@ -1,8 +1,10 @@
 package yule
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+	"time"
 )
 
 func gen(out chan int) {
@@ -75,7 +77,7 @@ func TestBranchRun(t *testing.T) {
 
 func TestBranchWrapperRun(t *testing.T) {
 
-	b := NewBranch().Add(F{"extract", gen}).Add(F{"transform", mul}).Add(F{"load", prt})
+	b := NewBranch().Add(F{Id: "extract", Value: gen}).Add(F{Id: "transform", Value: mul}).Add(F{Id: "load", Value: prt})
 	Build(b).Run()
 }
 
@@ -86,5 +88,45 @@ func TestFunctionRun(t *testing.T) {
 
 func TestFunctionWrapperRun(t *testing.T) {
 
-	Build(F{"extract", gen}, F{"transform", mul}, F{"load", prt}).Run()
+	Build(F{Id: "extract", Value: gen}, F{Id: "transform", Value: mul}, F{Id: "load", Value: prt}).Run()
+}
+
+func stressExtract(out chan string) {
+
+	// assumption: data is pulled from database and pushed to transform in another action
+	for i := 0; i < 1000000; i++ {
+		out <- "foo"
+	}
+
+	time.Sleep(20 * time.Second)
+
+	for i := 0; i < 500000; i++ {
+		out <- "bar"
+	}
+
+	close(out)
+}
+
+func stressTransform(in string) (out string, err error) {
+
+	// "foo" and "bar" are the only valid types
+	if (in != "foo") && (in != "bar") {
+		return "", errors.New("'in' must be of value ('foo' or 'bar')")
+	}
+
+	// assumption: processing some unit of data takes 4ms
+	time.Sleep(4 * time.Millisecond)
+
+	return in, nil
+}
+
+func stressLoad(in string) {
+
+	// assumption: uploading to database takes 3ms
+	time.Sleep(3 * time.Millisecond)
+}
+
+func TestFunctionStress(t *testing.T) {
+	pipeline := Build(F{Value: stressExtract}, F{Value: stressTransform}, F{Value: stressLoad})
+	pipeline.Run()
 }

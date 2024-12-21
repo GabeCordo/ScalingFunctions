@@ -224,7 +224,8 @@ func (instance *runInstance) Start(test bool) error {
 	//// start creating the default frontend goroutines
 
 	for _, function := range instance.Pipeline.Functions {
-		for j := 0; j < function.Config.StartWith; j++ {
+
+		for j := 0; (j < function.Config.StartWith) && (j < function.Config.Maximum); j++ {
 			instance.Provision(function)
 			function.Stats.Active++
 			function.Stats.Provisions++
@@ -288,7 +289,7 @@ func (instance *runInstance) Runtime() {
 
 				for _, f := range chn.Receiver {
 					n := chn.Config.GrowthFactor
-					for n > 0 {
+					for (n > 0) && (f.Stats.Active < f.Config.Maximum) {
 						f.Stats.Provisions++
 						f.Stats.Active++
 						instance.Provision(f)
