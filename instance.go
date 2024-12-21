@@ -75,9 +75,10 @@ type runInstance struct {
 	State     runStatus `json:"status"`
 	StartTime time.Time `json:"quitE-time"`
 
-	Pipeline    *Pipeline
-	metadata    map[string]string
-	injectables []reflect.Value
+	Pipeline         *Pipeline
+	metadata         map[string]string
+	injectables      []reflect.Value
+	numOfInjectables int
 
 	testing       bool
 	testingReport TestReport
@@ -108,7 +109,7 @@ func newInstance(pipeline *Pipeline, metadata map[string]string, injectables ...
 	for idx, injectable := range injectables {
 		supervisor.injectables[idx] = reflect.ValueOf(injectable)
 	}
-
+	supervisor.numOfInjectables = len(supervisor.injectables)
 	supervisor.startingWaitGroup.Add(1)
 
 	return supervisor
@@ -427,6 +428,11 @@ func (instance *runInstance) Call(function *pFunction, ins []reflect.Value) ([]r
 			isNil := lastResult.IsNil()
 
 			if !isNil {
+				// the yule framework shall be responsible for displaying errors sent
+				// by the pipeline to avoid requiring the developer to handle and return
+				// the error which is considered an anti-pattern
+				log.Println(lastResult.Elem())
+
 				if instance.testing {
 					instance.testingReport.Success = false
 					instance.testingReport.Step = function.Identifier
@@ -686,7 +692,12 @@ func (instance *runInstance) Provision(function *pFunction) {
 
 										// note: the value should accept some value or the pipeline we've provisioned
 										// 		 is invalid and should have been rejected prior to this step
-										if (nextFunctionReflection.NumIn() > 0) && (nextFunctionReflection.In(0).Kind() != reflect.Slice) {
+										//
+										// [!] Dec 21 ~ fix : original implementation did not account for injectable
+										//					  values that were introduced in November 2024.
+										//					-> the parameter checked should be an offset of the injectable
+										//					   s.t. if we have 2 injectables, the param checked is +2
+										if (nextFunctionReflection.NumIn() > instance.numOfInjectables) && (nextFunctionReflection.In(instance.numOfInjectables).Kind() != reflect.Slice) {
 
 											// f1 returns []A and f2 accepts A has been validated upto this point
 											// we should break apart []A and send the data 1-by-1 to f2
