@@ -1,114 +1,20 @@
 package yule
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"reflect"
 )
 
-type F struct {
-	Id    string
-	Value any
-	Max   int
-}
-
-// Metadata
-// is a wrapper type containing a set of function pointers used in a
-// pipeline and a configuration description of the pipeline.
-type Metadata struct {
-	Deployment *Deployment
-	Functions  []F
-}
-
 // build
 // is a function to generate a Runnable instance from a set of
 // one to many Branch instances.
-func build(branches ...*Branch) *Runnable {
+func build(branches ...*Branch) (*Runnable, error) {
 
-	// memory allocations //
-	metadata := new(Metadata)
-
-	deployment := new(Deployment)
-	metadata.Deployment = deployment
-	metadata.Functions = make([]F, 0)
-
-	deployment.Pipes = make([]Pipe, 0)
-	deployment.Functions = make([]Function, 0)
-
-	// default values //
-
-	numOfPipes := 0
-
-	functions := make(map[uintptr]Function)
-
-	// each branch describes a sequential chain of functions
-	for _, branch := range branches {
-
-		numOfSteps := len(branch.steps)
-
-		previousPipe := ""
-
-		// the functions inside each branch can point to other branches
-		for jdx, step := range branch.steps {
-
-			isLastStep := jdx == (numOfSteps - 1)
-
-			sid := reflect.ValueOf(step.value).Pointer()
-
-			// is the step function already found?
-			if _, found := functions[sid]; found && isLastStep {
-				continue
-			} else if found && !isLastStep {
-				panic("repeated function must be at the end of the branch")
-			}
-
-			f := Function{StartWith: 1}
-			if step.id != "" {
-				f.Identifier = step.id
-			} else {
-				step.id = fmt.Sprint(sid)
-				f.Identifier = step.id
-			}
-			if step.max >= 1 {
-				f.Maximum = step.max
-			} else {
-				f.Maximum = 1000000
-			}
-			f.From = previousPipe
-
-			// if the function is not a terminal step we will need to create a channel
-			// to send data to.
-			if !isLastStep {
-
-				// check if the next step points to a known branch
-				nextSid := reflect.ValueOf(branch.steps[jdx+1].value).Pointer()
-
-				if repeatedFunc, found := functions[nextSid]; found {
-					// point to an existing pipe
-					f.To = repeatedFunc.From
-				} else {
-					// create a new pipe the function pushes data to //
-					p := Pipe{Identifier: fmt.Sprint(numOfPipes), Threshold: 1, GrowthFactor: 2}
-					deployment.Pipes = append(deployment.Pipes, p)
-
-					// declare that the function pushes data to this pipe //
-					f.To = fmt.Sprint(numOfPipes)
-
-					// update the pipe records //
-					previousPipe = fmt.Sprint(numOfPipes)
-					numOfPipes++
-				}
-			}
-
-			// add the built function //
-			deployment.Functions = append(deployment.Functions, f)
-			metadata.Functions = append(metadata.Functions, F{Value: step.value, Id: step.id, Max: step.max})
-			functions[sid] = f
-		}
-
-		previousPipe = ""
+	metadata, err := buildMetadata(branches...)
+	if err != nil {
+		return nil, err
 	}
-
 	return newRunnable(metadata)
 }
 
@@ -116,7 +22,7 @@ func build(branches ...*Branch) *Runnable {
 // is a wrapper function to generate a branch from a set of functions. Instead
 // of requiring the developer to write bloated code, the wrapper function can
 // be used for simplistic functions that represent a line rather than tree.
-func buildLinear(functions ...any) *Runnable {
+func buildLinear(functions ...any) (*Runnable, error) {
 
 	branch := NewBranch()
 	for _, function := range functions {
@@ -125,32 +31,12 @@ func buildLinear(functions ...any) *Runnable {
 	return build(branch)
 }
 
-func buildFrom(deployment *Deployment, repository *Repository) *Runnable {
+func buildFrom(deployment *Deployment, repository *Repository) (*Runnable, error) {
 
-	if deployment == nil {
-		panic("deployment cannot be nil")
+	metadata, err := buildMetadataFrom(deployment, repository)
+	if err != nil {
+		return nil, err
 	}
-
-	metadata := new(Metadata)
-	metadata.Deployment = deployment
-	metadata.Functions = make([]F, 0)
-
-	for _, function := range deployment.Functions {
-
-		if m, found := repository.modules[function.Module]; found {
-
-			if f, found := m.functions[function.Identifier]; found {
-				metadata.Functions = append(metadata.Functions, F{Value: f.Value})
-			} else {
-				// TODO : add more description
-				panic("function module not found")
-			}
-		} else {
-			// TODO : add more descriptions
-			panic("module not found")
-		}
-	}
-
 	return newRunnable(metadata)
 }
 
@@ -231,7 +117,7 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 					log.Panicf("the parameter at index %d is not a repository\n", idx)
 				}
 			}
-		case invalidVariant:
+		default: // invalidVariant
 			{
 				switch iType {
 				case branchType:
@@ -244,7 +130,7 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 					variant = configVariant
 				case repositoryType:
 					log.Panicf("the parameter at index %d is a repository; did you mean to provide a deployment first?\n", idx)
-				case invalidType:
+				default: // invalidType
 					log.Panicf("the parameter at index %d is unexpected\n", idx)
 				}
 			}
@@ -268,10 +154,12 @@ func Build(input ...any) (runnable *Runnable) {
 
 	variant := getBuildVariant(input...)
 
+	var err error = nil
+
 	switch variant {
 	case functionVariant, functionWrapperVariant:
 		{
-			runnable = buildLinear(input...)
+			runnable, err = buildLinear(input...)
 		}
 	case branchVariant:
 		{
@@ -279,18 +167,22 @@ func Build(input ...any) (runnable *Runnable) {
 			for i := 0; i < numOfArguments; i++ {
 				branches[i] = (input[i]).(*Branch)
 			}
-			runnable = build(branches...)
+			runnable, err = build(branches...)
 		}
 	case configVariant:
 		{
 			d := (input[0]).(*Deployment)
 			r := (input[1]).(*Repository)
-			runnable = buildFrom(d, r)
+			runnable, err = buildFrom(d, r)
 		}
 	default:
 		{
-			panic("unknown build variant")
+			err = errors.New("unknown build variant")
 		}
+	}
+
+	if err != nil {
+		panic(err)
 	}
 
 	return runnable

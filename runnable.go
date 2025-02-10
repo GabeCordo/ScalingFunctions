@@ -8,9 +8,12 @@ import (
 type Runnable struct {
 	pipeline *Pipeline
 	metadata *Metadata
+
+	In  chan any
+	Out chan any
 }
 
-func newRunnable(metadata *Metadata) *Runnable {
+func newRunnable(metadata *Metadata) (*Runnable, error) {
 
 	runnable := new(Runnable)
 	runnable.metadata = metadata
@@ -89,7 +92,7 @@ func newRunnable(metadata *Metadata) *Runnable {
 		runnable.pipeline.Functions[i] = function
 	}
 
-	return runnable
+	return runnable, nil
 }
 
 func (runnable *Runnable) RunWithMetadata(metadata ...map[string]string) error {
