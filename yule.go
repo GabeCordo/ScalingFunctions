@@ -4,41 +4,8 @@ import (
 	"errors"
 	"log"
 	"reflect"
+	"sync"
 )
-
-// build
-// is a function to generate a Runnable instance from a set of
-// one to many Branch instances.
-func build(branches ...*Branch) (*Runnable, error) {
-
-	metadata, err := buildMetadata(branches...)
-	if err != nil {
-		return nil, err
-	}
-	return newRunnable(metadata)
-}
-
-// buildLinear
-// is a wrapper function to generate a branch from a set of functions. Instead
-// of requiring the developer to write bloated code, the wrapper function can
-// be used for simplistic functions that represent a line rather than tree.
-func buildLinear(functions ...any) (*Runnable, error) {
-
-	branch := NewBranch()
-	for _, function := range functions {
-		branch.Add(function)
-	}
-	return build(branch)
-}
-
-func buildFrom(deployment *Deployment, repository *Repository) (*Runnable, error) {
-
-	metadata, err := buildMetadataFrom(deployment, repository)
-	if err != nil {
-		return nil, err
-	}
-	return newRunnable(metadata)
-}
 
 // notableType
 // categorises and input to a lexeme.
@@ -65,9 +32,45 @@ const (
 	invalidVariant
 )
 
+// build
+// is a function to generate a RunnablePipeline instance from a set of
+// one to many Branch instances.
+func build(branches ...*Branch) (Pipeline, error) {
+
+	metadata, err := buildMetadata(branches...)
+	if err != nil {
+		return Pipeline{}, err
+	}
+	return buildPipeline(metadata)
+}
+
+// buildLinear
+// is a wrapper function to generate a branch from a set of functions. Instead
+// of requiring the developer to write bloated code, the wrapper function can
+// be used for simplistic functions that represent a line rather than tree.
+func buildLinear(functions ...any) (Pipeline, error) {
+
+	branch := NewBranch()
+	for _, function := range functions {
+		branch.Add(function)
+	}
+	return build(branch)
+}
+
+// buildFrom
+// is a function to generate a runnable Pipeline from Pipeline metadata and repository.
+func buildFrom(deployment *PipelineMetadata, repository *Repository) (Pipeline, error) {
+
+	metadata, err := buildMetadataFrom(deployment, repository)
+	if err != nil {
+		return Pipeline{}, err
+	}
+	return buildPipeline(metadata)
+}
+
 // getBuildVariant
 // is a function for parsing the parameters passed to Build and determining
-// what sub-function needs to be called to generate the correct Runnable instance.
+// what sub-function needs to be called to generate the correct RunnablePipeline instance.
 func getBuildVariant(inputs ...any) (variant buildVariant) {
 
 	variant = invalidVariant
@@ -81,9 +84,9 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 			iType = branchType
 		} else if _, ok = input.(*Repository); ok {
 			iType = repositoryType
-		} else if _, ok = input.(*Deployment); ok {
+		} else if _, ok = input.(*PipelineMetadata); ok {
 			iType = deploymentType
-		} else if _, ok = input.(F); ok {
+		} else if _, ok = input.(FunctionLink); ok {
 			iType = functionWrapperType
 		} else if reflect.TypeOf(input).Kind() == reflect.Func {
 			iType = functionType
@@ -141,14 +144,14 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 }
 
 // Build
-// is a function to create a Runnable instance from a set of branches or functions.
+// is a function to create a RunnablePipeline instance from a set of branches or functions.
 //
 // Variant 1:	Build(func1, func2, ... , funcn-1, funcn)
 //
 // Variant 2:   Build(branch1, branch2, ... , branchn-1, branchn)
 //
 // Variant 3:   Build(deployment, repository)
-func Build(input ...any) (runnable *Runnable) {
+func Build(input ...any) (pipeline Pipeline) {
 
 	numOfArguments := len(input)
 
@@ -159,7 +162,7 @@ func Build(input ...any) (runnable *Runnable) {
 	switch variant {
 	case functionVariant, functionWrapperVariant:
 		{
-			runnable, err = buildLinear(input...)
+			pipeline, err = buildLinear(input...)
 		}
 	case branchVariant:
 		{
@@ -167,13 +170,13 @@ func Build(input ...any) (runnable *Runnable) {
 			for i := 0; i < numOfArguments; i++ {
 				branches[i] = (input[i]).(*Branch)
 			}
-			runnable, err = build(branches...)
+			pipeline, err = build(branches...)
 		}
 	case configVariant:
 		{
-			d := (input[0]).(*Deployment)
+			d := (input[0]).(*PipelineMetadata)
 			r := (input[1]).(*Repository)
-			runnable, err = buildFrom(d, r)
+			pipeline, err = buildFrom(d, r)
 		}
 	default:
 		{
@@ -185,5 +188,60 @@ func Build(input ...any) (runnable *Runnable) {
 		panic(err)
 	}
 
-	return runnable
+	return pipeline
+}
+
+func Run(pipeline Pipeline, injectables ...any) error {
+
+	m := make(map[string]string)
+	runtime := newPipelineRuntime(pipeline, m, injectables...)
+	return runtime.start(false)
+}
+
+type TestReport struct {
+	Success bool   `json:"success"`
+	Step    string `json:"step"`
+	Cause   error  `json:"cause"`
+}
+
+func Test(pipeline Pipeline, data any, injectables ...any) TestReport {
+
+	m := make(map[string]string)
+	runtime := newPipelineRuntime(pipeline, m, injectables...)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		runtime.start(true)
+		wg.Done()
+	}()
+
+	runtime.send(data)
+	runtime.close()
+
+	wg.Wait()
+
+	return runtime.testingReport
+}
+
+func TestAs(pipeline Pipeline, f string, data any, injectables ...any) TestReport {
+
+	m := make(map[string]string)
+	runtime := newPipelineRuntime(pipeline, m, injectables...)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		runtime.start(true)
+		wg.Done()
+	}()
+
+	runtime.send(data, f)
+	runtime.close()
+
+	wg.Wait()
+
+	return runtime.testingReport
 }

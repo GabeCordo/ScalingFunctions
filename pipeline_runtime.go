@@ -1,3 +1,7 @@
+// Package yule
+//
+// Copyright (c) 2024-2025. Gabriel Cordovado
+// All rights reserved.
 package yule
 
 import (
@@ -69,13 +73,13 @@ const (
 
 const MaximumRoutinesPerSupervisor = 2000
 
-type runInstance struct {
+type pipelineRuntime struct {
 	Id uint64 `json:"id"`
 
 	State     runStatus `json:"status"`
 	StartTime time.Time `json:"quitE-time"`
 
-	Pipeline         *Pipeline
+	Pipeline         Pipeline
 	metadata         map[string]string
 	injectables      []reflect.Value
 	numOfInjectables int
@@ -90,8 +94,8 @@ type runInstance struct {
 	mutex             sync.RWMutex
 }
 
-func newInstance(pipeline *Pipeline, metadata map[string]string, injectables ...any) *runInstance {
-	supervisor := new(runInstance)
+func newPipelineRuntime(pipeline Pipeline, metadata map[string]string, injectables ...any) *pipelineRuntime {
+	supervisor := new(pipelineRuntime)
 
 	/**
 	 * Note: we may wish to dynamically modify the threshold and growth-factor rates
@@ -115,14 +119,7 @@ func newInstance(pipeline *Pipeline, metadata map[string]string, injectables ...
 	return supervisor
 }
 
-type Summary struct {
-	Namespace  string
-	Pipeline   string
-	Supervisor uint64
-	Statistics *Statistics
-}
-
-func (instance *runInstance) Event(event runEvent) bool {
+func (instance *pipelineRuntime) event(event runEvent) bool {
 	instance.mutex.Lock()
 	defer instance.mutex.Unlock()
 
@@ -169,7 +166,7 @@ func (instance *runInstance) Event(event runEvent) bool {
 	return true // represents a boolean ~ hasStateChanged?
 }
 
-func (instance *runInstance) IsAlive() bool {
+func (instance *pipelineRuntime) isAlive() bool {
 
 	instance.mutex.RLock()
 	defer instance.mutex.RUnlock()
@@ -177,10 +174,10 @@ func (instance *runInstance) IsAlive() bool {
 	return (instance.State != Failed) && (instance.State != Terminated)
 }
 
-func (instance *runInstance) Start(test bool) error {
-	instance.Event(Startup)
+func (instance *pipelineRuntime) start(test bool) error {
+	instance.event(Startup)
 
-	defer instance.Event(TearedDown)
+	defer instance.event(TearedDown)
 
 	instance.testing = test
 
@@ -211,7 +208,7 @@ func (instance *runInstance) Start(test bool) error {
 		f.Call(instance.injectables)
 	}
 
-	//// add all the metadata passed to the pipeline to the local environment
+	//// add all the metadata passed to the Pipeline to the local environment
 
 	// TODO : possibly enhance security?
 	for key, value := range instance.metadata {
@@ -227,7 +224,7 @@ func (instance *runInstance) Start(test bool) error {
 	for _, function := range instance.Pipeline.Functions {
 
 		for j := 0; (j < function.Config.StartWith) && (j < function.Config.Maximum); j++ {
-			instance.Provision(function)
+			instance.provision(function)
 			function.Stats.Active++
 			function.Stats.Provisions++
 		}
@@ -237,7 +234,7 @@ func (instance *runInstance) Start(test bool) error {
 
 	// every N seconds we should check if the ETChannel or TLChannel is congested
 	// and requires us to provision additional nodes
-	go instance.Runtime()
+	go instance.runtime()
 
 	instance.startingWaitGroup.Done() // allow actions that need to wait for startup to begin
 	instance.waitGroup.Wait()         // wait for the Extract-Transform-Load (ETL) Cycle to Complete
@@ -259,7 +256,7 @@ func (instance *runInstance) Start(test bool) error {
 	return err
 }
 
-func (instance *runInstance) Teardown() {
+func (instance *pipelineRuntime) teardown() {
 
 	// TODO : add a guard in case this value is not a function
 	if instance.Pipeline.OnStartup != nil {
@@ -267,10 +264,10 @@ func (instance *runInstance) Teardown() {
 		f.Call(instance.injectables)
 	}
 
-	instance.Event(Suspend)
+	instance.event(Suspend)
 }
 
-func (instance *runInstance) Runtime() {
+func (instance *pipelineRuntime) runtime() {
 	for {
 		if instance.State == Terminated {
 			break
@@ -293,7 +290,7 @@ func (instance *runInstance) Runtime() {
 					for (n > 0) && (f.Stats.Active < f.Config.Maximum) {
 						f.Stats.Provisions++
 						f.Stats.Active++
-						instance.Provision(f)
+						instance.provision(f)
 						n--
 					}
 				}
@@ -309,7 +306,7 @@ func (instance *runInstance) Runtime() {
 							break
 						}
 						f.Stats.Active--
-						instance.Remove(f)
+						instance.remove(f)
 						n--
 					}
 				}
@@ -321,7 +318,7 @@ func (instance *runInstance) Runtime() {
 	}
 }
 
-func (instance *runInstance) ExtractWrapper(function *pFunction, channel *managedChannel) <-chan struct{} {
+func (instance *pipelineRuntime) extractWrapper(function *pFunction, channel *managedChannel) <-chan struct{} {
 	done := make(chan struct{})
 
 	// the function always finishes till completion unless a direct shutdown is called on the server
@@ -353,7 +350,7 @@ func (instance *runInstance) ExtractWrapper(function *pFunction, channel *manage
 
 		// as the extract function runs asynchronously and sends data to the
 		// channel, receive data from the channel and push data to the next
-		// function in the pipeline sequence.
+		// function in the Pipeline sequence.
 		if (function.Reflected.Type.NumIn() - numOfInjectibles) > 0 {
 
 			for {
@@ -369,17 +366,17 @@ func (instance *runInstance) ExtractWrapper(function *pFunction, channel *manage
 	return done
 }
 
-func (instance *runInstance) ExtractShutdownWrapper() <-chan struct{} {
+func (instance *pipelineRuntime) extractShutdownWrapper() <-chan struct{} {
 	done := make(chan struct{})
 
 	// we need to create a separate goroutine otherwise it will block the current
-	// thread from re-evaluating the select statement wherever the ExtractShutdownWrapper is called
+	// thread from re-evaluating the select statement wherever the extractShutdownWrapper is called
 	go func() {
 		defer close(done)
 		for {
-			// the IsAlive clause ensures that once a runner is dead, we will not leak memory
+			// the isAlive clause ensures that once a runner is dead, we will not leak memory
 			// with a forever-running goroutine
-			if (instance.State == Stopping) || (!instance.IsAlive()) {
+			if (instance.State == Stopping) || (!instance.isAlive()) {
 				break
 			}
 			time.Sleep(1 * time.Second)
@@ -391,17 +388,17 @@ func (instance *runInstance) ExtractShutdownWrapper() <-chan struct{} {
 
 var errorInterface = reflect.TypeOf((*error)(nil)).Elem()
 
-// Call
+// call
 // a wrapper function that checks the returned values from a function call for
 // error values. if the function returns an error that is non-nil we will set
 // the returned boolean flag to true indicating something may have gone wrong
 // inside the function call.
-func (instance *runInstance) Call(function *pFunction, ins []reflect.Value) ([]reflect.Value, bool) {
+func (instance *pipelineRuntime) call(function *pFunction, ins []reflect.Value) ([]reflect.Value, bool) {
 
 	drop := false
 
 	// append the values given to the function on-top of the injectables that need to
-	// be passed to every step in the pipeline
+	// be passed to every step in the Pipeline
 	arguments := append(instance.injectables, ins...)
 	results := function.Reflected.Value.Call(arguments)
 
@@ -411,13 +408,13 @@ func (instance *runInstance) Call(function *pFunction, ins []reflect.Value) ([]r
 	// a common pattern in golang is to return (value, error) where error can be used
 	// to identify that the function was not able to run to completion.
 	//
-	// the pipeline supports a similar method of identifying that the function failed
+	// the Pipeline supports a similar method of identifying that the function failed
 	// to run successfully to completion. when the function returns an error value
-	// (that must be the last value returned) the pipeline will check whether the
+	// (that must be the last value returned) the Pipeline will check whether the
 	// error is nil or not to determine whether the resultant data should be used.
 	//
-	// error is nil -> keep sending the resultant data along the pipeline
-	// error -> do NOT pass the data along the pipeline (aka. drop the data)
+	// error is nil -> keep sending the resultant data along the Pipeline
+	// error -> do NOT pass the data along the Pipeline (aka. drop the data)
 	if numResults > 0 {
 
 		lastResult := results[numResults-1]
@@ -429,7 +426,7 @@ func (instance *runInstance) Call(function *pFunction, ins []reflect.Value) ([]r
 
 			if !isNil {
 				// the yule framework shall be responsible for displaying errors sent
-				// by the pipeline to avoid requiring the developer to handle and return
+				// by the Pipeline to avoid requiring the developer to handle and return
 				// the error which is considered an anti-pattern
 				log.Println(lastResult.Elem())
 
@@ -441,7 +438,7 @@ func (instance *runInstance) Call(function *pFunction, ins []reflect.Value) ([]r
 				drop = true
 			}
 
-			// never pass an error along the pipeline
+			// never pass an error along the Pipeline
 			results = results[:numResults-1]
 		}
 	}
@@ -449,9 +446,9 @@ func (instance *runInstance) Call(function *pFunction, ins []reflect.Value) ([]r
 	return results, drop
 }
 
-func (instance *runInstance) Provision(function *pFunction) {
-	instance.Event(StartProvision)
-	defer instance.Event(EndProvision)
+func (instance *pipelineRuntime) provision(function *pFunction) {
+	instance.event(StartProvision)
+	defer instance.event(EndProvision)
 
 	// the runner must provision new threads one at a time.
 	// note: avoid the possibility of >1 thread modifying the wait-group at a time
@@ -462,7 +459,7 @@ func (instance *runInstance) Provision(function *pFunction) {
 	// we should inform the wait group that the runner isn't finished until the wg is done
 	instance.waitGroup.Add(1)
 
-	go func(supervisor *runInstance, function *pFunction) {
+	go func(supervisor *pipelineRuntime, function *pFunction) {
 
 		if (function.From == nil) && (function.To != nil) {
 			// the function is a STARTING NODE of the Pipeline if no data is being received
@@ -482,7 +479,7 @@ func (instance *runInstance) Provision(function *pFunction) {
 				}
 			}()
 
-			// support passing values to the pipeline manually
+			// support passing values to the Pipeline manually
 			// todo : add more description
 			if instance.testing {
 				return
@@ -506,9 +503,9 @@ func (instance *runInstance) Provision(function *pFunction) {
 			} else {
 
 				select {
-				case <-supervisor.ExtractWrapper(function, function.To.Value):
+				case <-supervisor.extractWrapper(function, function.To.Value):
 					break
-				case <-supervisor.ExtractShutdownWrapper():
+				case <-supervisor.extractShutdownWrapper():
 					fmt.Println("shutdown caused extract to finish early")
 					break
 				}
@@ -669,18 +666,18 @@ func (instance *runInstance) Provision(function *pFunction) {
 						if function.Config.WaitBefore {
 							queuedRequests = reflect.Append(queuedRequests, request.Data[0])
 						} else {
-							results, drop := supervisor.Call(function, request.Data)
+							results, drop := supervisor.call(function, request.Data)
 
 							function.To.Mutex.Lock()
 							if !drop {
 
 								// PROPOSAL 6.
-								// ~let there be two functions f1 and f2 that are transformers along the pipeline.
+								// ~let there be two functions f1 and f2 that are transformers along the Pipeline.
 								// ~let f1 return a slice of type A s.t. []A is the passed along value
 								// ~let f2 accept a value of type A s.t. we expect f1 to send us A
 								//
 								// if (f1 sends to f2) and (f1 returns []A while f2 accepts A) then:
-								// the pipeline shall break apart the []A returned by f1
+								// the Pipeline shall break apart the []A returned by f1
 								// (and) push each element A from the slice to the successive function f2
 								if len(results) > 0 && results[0].Kind() == reflect.Slice {
 
@@ -690,7 +687,7 @@ func (instance *runInstance) Provision(function *pFunction) {
 										nextFunction := function.To.Receiver[0]
 										nextFunctionReflection := nextFunction.Reflected.Type
 
-										// note: the value should accept some value or the pipeline we've provisioned
+										// note: the value should accept some value or the Pipeline we've provisioned
 										// 		 is invalid and should have been rejected prior to this step
 										//
 										// [!] Dec 21 ~ fix : original implementation did not account for injectable
@@ -746,7 +743,7 @@ func (instance *runInstance) Provision(function *pFunction) {
 					// if we were waiting for the channel to close before transforming the data,
 					// call the function now that the channel is closed
 					if function.Config.WaitBefore {
-						results, drop := supervisor.Call(function, []reflect.Value{queuedRequests})
+						results, drop := supervisor.call(function, []reflect.Value{queuedRequests})
 
 						function.To.Mutex.Lock()
 						if !drop {
@@ -774,7 +771,7 @@ func (instance *runInstance) Provision(function *pFunction) {
 	}(instance, function)
 }
 
-func (instance *runInstance) Remove(function *pFunction) {
+func (instance *pipelineRuntime) remove(function *pFunction) {
 
 	if function.Stats.Active <= 0 {
 		panic("attempting to quit when no functions are running")
@@ -785,12 +782,12 @@ func (instance *runInstance) Remove(function *pFunction) {
 	quit <- true
 }
 
-func (instance *runInstance) send(data any, functionId ...string) {
+func (instance *pipelineRuntime) send(data any, functionId ...string) {
 
 	specifiedFunction := len(functionId) > 0
 
 	// the developer needs to specify which root they want to mimic
-	// when the pipeline's topology is more complex than a linear line
+	// when the Pipeline's topology is more complex than a linear line
 	if !specifiedFunction && (len(instance.Pipeline.Roots) > 1) {
 		panic("testing non-linear pipelines requires specifying which generator function is being stubbed")
 	}
@@ -801,7 +798,7 @@ func (instance *runInstance) send(data any, functionId ...string) {
 	isDataSent := false
 	for _, f := range instance.Pipeline.Roots {
 
-		// do not push data to the pipeline when the function identifier is
+		// do not push data to the Pipeline when the function identifier is
 		// specified and does not match.
 		if specifiedFunction && (f.Identifier != functionId[0]) {
 			continue
@@ -813,11 +810,11 @@ func (instance *runInstance) send(data any, functionId ...string) {
 	}
 
 	if !isDataSent {
-		panic("attempt to test the pipeline failed, could not find a pipeline to push data to")
+		panic("attempt to test the Pipeline failed, could not find a Pipeline to push data to")
 	}
 }
 
-func (instance *runInstance) close() {
+func (instance *pipelineRuntime) close() {
 
 	instance.startingWaitGroup.Wait()
 
@@ -828,10 +825,6 @@ func (instance *runInstance) close() {
 	}
 }
 
-func (instance *runInstance) Deletable() bool {
-	return (instance.State == Terminated) || (instance.State == Failed)
-}
-
-func (instance *runInstance) Print() {
+func (instance *pipelineRuntime) print() {
 	fmt.Printf("Id: %d\n", instance.Id)
 }

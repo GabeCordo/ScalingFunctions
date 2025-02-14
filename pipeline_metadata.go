@@ -1,3 +1,7 @@
+// Package yule
+//
+// Copyright (c) 2024-2025. Gabriel Cordovado
+// All rights reserved.
 package yule
 
 // OnCrash
@@ -18,7 +22,7 @@ const (
 	WaitAndPush            = "WaitAndPush"     // tells a function to wait for a channel to close before processing data as an array.
 )
 
-type Function struct {
+type FunctionMetadata struct {
 	Module     string `json:"module"`
 	Identifier string `json:"id" yaml:"id"`
 	From       string `json:"from,omitempty" yaml:"from,omitempty"`             // what pipe a function is sending data to.
@@ -28,17 +32,17 @@ type Function struct {
 	Maximum    int    `json:"maximum,omitempty" yaml:"maximum"` // maximum instances of the function that can be run at the same time
 }
 
-type Pipe struct {
+type PipeMetadata struct {
 	Identifier   string  `json:"id" yaml:"id"`
 	Threshold    int     `json:"threshold yaml:"threshold""`         // the amount of data that must sit idle in a pipe before we consider the pipe congested.
 	GrowthFactor float64 `json:"growth_factor" yaml:"growth_factor"` // the factor the number of receivers will multiply by to reduce congestion in the pipe.
 }
 
-type Deployment struct {
-	Identifier string     `json:"id" yaml:"id"`
-	OnCrash    OnCrash    `json:"on_crash,omitempty" yaml:"on_crash,omitempty"`
-	Functions  []Function `json:"functions" yaml:"functions"`
-	Pipes      []Pipe     `json:"pipes" yaml:"pipes"`
-	OnStartup  string     `json:"on_startup" yaml:"on_startup,omitempty"`
-	OnTeardown string     `json:"on_teardown" yaml:"on_teardown,omitempty"`
+type PipelineMetadata struct {
+	Identifier string             `json:"id" yaml:"id"`
+	OnCrash    OnCrash            `json:"on_crash,omitempty" yaml:"on_crash,omitempty"`
+	Functions  []FunctionMetadata `json:"functions" yaml:"functions"`
+	Pipes      []PipeMetadata     `json:"pipes" yaml:"pipes"`
+	OnStartup  string             `json:"on_startup" yaml:"on_startup,omitempty"`
+	OnTeardown string             `json:"on_teardown" yaml:"on_teardown,omitempty"`
 }

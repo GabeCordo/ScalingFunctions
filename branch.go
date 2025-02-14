@@ -36,7 +36,7 @@ func (b *Branch) Add(data any) *Branch {
 
 	var s Step
 
-	if w, isWrapperType := data.(F); isWrapperType {
+	if w, isWrapperType := data.(FunctionLink); isWrapperType {
 		v = reflect.ValueOf(w.Value)
 		k = v.Kind()
 

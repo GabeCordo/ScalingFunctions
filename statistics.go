@@ -33,11 +33,11 @@ type Statistics struct {
 }
 
 // Print
-// is a debug function used to view a snapshot of the pipeline at an instance in time.
+// is a debug function used to view a snapshot of the Pipeline at an instance in time.
 func (s Statistics) Print() {
 
 	for idx, function := range s.Functions {
-		fmt.Printf("Function (%d):\n", idx)
+		fmt.Printf("FunctionMetadata (%d):\n", idx)
 		fmt.Printf("\tActive: %d\n\tProvisioned: %d\n", function.Active, function.Provisions)
 	}
 

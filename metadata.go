@@ -10,16 +10,16 @@ const maximumGoroutinesPerFunction = 1000
 
 // Metadata
 // is a wrapper type containing a set of function pointers used in a
-// pipeline and a configuration description of the pipeline.
+// Pipeline and a configuration description of the Pipeline.
 type Metadata struct {
-	Deployment *Deployment
-	Functions  []F
+	Pipeline  PipelineMetadata
+	Functions []FunctionLink
 }
 
-type F struct {
+type FunctionLink struct {
 	Id    string
-	Value any
 	Max   int
+	Value any
 }
 
 func buildMetadata(branches ...*Branch) (*Metadata, error) {
@@ -27,18 +27,16 @@ func buildMetadata(branches ...*Branch) (*Metadata, error) {
 	// memory allocations //
 	metadata := new(Metadata)
 
-	deployment := new(Deployment)
-	metadata.Deployment = deployment
-	metadata.Functions = make([]F, 0)
+	metadata.Functions = make([]FunctionLink, 0)
 
-	deployment.Pipes = make([]Pipe, 0)
-	deployment.Functions = make([]Function, 0)
+	metadata.Pipeline.Pipes = make([]PipeMetadata, 0)
+	metadata.Pipeline.Functions = make([]FunctionMetadata, 0)
 
 	// default values //
 
 	numOfPipes := 0
 
-	functions := make(map[uintptr]Function)
+	functions := make(map[uintptr]FunctionMetadata)
 
 	// each branch describes a sequential chain of functions
 	for _, branch := range branches {
@@ -61,7 +59,7 @@ func buildMetadata(branches ...*Branch) (*Metadata, error) {
 				return nil, errors.New("repeated function must be at the end of the branch")
 			}
 
-			f := Function{StartWith: 1}
+			f := FunctionMetadata{StartWith: 1}
 			if step.id != "" {
 				f.Identifier = step.id
 			} else {
@@ -87,8 +85,8 @@ func buildMetadata(branches ...*Branch) (*Metadata, error) {
 					f.To = repeatedFunc.From
 				} else {
 					// create a new pipe the function pushes data to //
-					p := Pipe{Identifier: fmt.Sprint(numOfPipes), Threshold: 1, GrowthFactor: 2}
-					deployment.Pipes = append(deployment.Pipes, p)
+					p := PipeMetadata{Identifier: fmt.Sprint(numOfPipes), Threshold: 1, GrowthFactor: 2}
+					metadata.Pipeline.Pipes = append(metadata.Pipeline.Pipes, p)
 
 					// declare that the function pushes data to this pipe //
 					f.To = fmt.Sprint(numOfPipes)
@@ -100,8 +98,8 @@ func buildMetadata(branches ...*Branch) (*Metadata, error) {
 			}
 
 			// add the built function //
-			deployment.Functions = append(deployment.Functions, f)
-			metadata.Functions = append(metadata.Functions, F{Value: step.value, Id: step.id, Max: step.max})
+			metadata.Pipeline.Functions = append(metadata.Pipeline.Functions, f)
+			metadata.Functions = append(metadata.Functions, FunctionLink{Value: step.value, Id: step.id, Max: step.max})
 			functions[sid] = f
 		}
 
@@ -111,22 +109,22 @@ func buildMetadata(branches ...*Branch) (*Metadata, error) {
 	return metadata, nil
 }
 
-func buildMetadataFrom(deployment *Deployment, repository *Repository) (*Metadata, error) {
+func buildMetadataFrom(deployment *PipelineMetadata, repository *Repository) (*Metadata, error) {
 
 	if (deployment == nil) || (repository == nil) {
 		return nil, errors.New("deployment or repository cannot be nil")
 	}
 
 	metadata := new(Metadata)
-	metadata.Deployment = deployment
-	metadata.Functions = make([]F, 0)
+	metadata.Pipeline = *deployment
+	metadata.Functions = make([]FunctionLink, 0)
 
 	for _, function := range deployment.Functions {
 
 		if m, found := repository.modules[function.Module]; found {
 
 			if f, found := m.functions[function.Identifier]; found {
-				metadata.Functions = append(metadata.Functions, F{Value: f.Value})
+				metadata.Functions = append(metadata.Functions, FunctionLink{Value: f.Value})
 			} else {
 				// TODO : add more description
 				panic("function module not found")

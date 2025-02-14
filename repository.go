@@ -8,7 +8,7 @@ import (
 type Module struct {
 	Name      string
 	Version   string
-	functions map[string]F
+	functions map[string]FunctionLink
 	mutex     sync.RWMutex
 }
 
@@ -20,7 +20,7 @@ func (module *Module) LinkFunction(name string, value any) error {
 	if _, found := module.functions[name]; found {
 		return errors.New("module already has a function with this name")
 	} else {
-		module.functions[name] = F{Id: name, Value: value}
+		module.functions[name] = FunctionLink{Id: name, Value: value}
 	}
 
 	return nil
@@ -60,7 +60,7 @@ func (r *Repository) Module(name string) *Module {
 
 		mod := new(Module)
 		mod.Name = name
-		mod.functions = make(map[string]F)
+		mod.functions = make(map[string]FunctionLink)
 
 		r.modules[name] = mod
 	}

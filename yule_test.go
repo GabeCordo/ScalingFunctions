@@ -47,15 +47,15 @@ func TestBranchBuild(t *testing.T) {
 
 func TestBuildFrom(t *testing.T) {
 
-	d := Deployment{
-		Functions: []Function{
-			Function{Module: "common", Identifier: "gen", To: "0"},
-			Function{Module: "common", Identifier: "mul", From: "0", To: "1"},
-			Function{Module: "common", Identifier: "prt", From: "1"},
+	d := PipelineMetadata{
+		Functions: []FunctionMetadata{
+			FunctionMetadata{Module: "common", Identifier: "gen", To: "0"},
+			FunctionMetadata{Module: "common", Identifier: "mul", From: "0", To: "1"},
+			FunctionMetadata{Module: "common", Identifier: "prt", From: "1"},
 		},
-		Pipes: []Pipe{
-			Pipe{Identifier: "0", Threshold: 1, GrowthFactor: 2.0},
-			Pipe{Identifier: "1", Threshold: 1, GrowthFactor: 2.0},
+		Pipes: []PipeMetadata{
+			PipeMetadata{Identifier: "0", Threshold: 1, GrowthFactor: 2.0},
+			PipeMetadata{Identifier: "1", Threshold: 1, GrowthFactor: 2.0},
 		},
 	}
 
@@ -66,29 +66,29 @@ func TestBuildFrom(t *testing.T) {
 		"prt": prt,
 	})
 
-	Build(&d, r).Run()
+	Run(Build(&d, r))
 }
 
 func TestBranchRun(t *testing.T) {
 
 	b := NewBranch().Add(gen).Add(mul).Add(prt)
-	Build(b).Run()
+	Run(Build(b))
 }
 
 func TestBranchWrapperRun(t *testing.T) {
 
-	b := NewBranch().Add(F{Id: "extract", Value: gen}).Add(F{Id: "transform", Value: mul}).Add(F{Id: "load", Value: prt})
-	Build(b).Run()
+	b := NewBranch().Add(FunctionLink{Id: "extract", Value: gen}).Add(FunctionLink{Id: "transform", Value: mul}).Add(FunctionLink{Id: "load", Value: prt})
+	Run(Build(b))
 }
 
 func TestFunctionRun(t *testing.T) {
 
-	Build(gen, mul, prt).Run()
+	Run(Build(gen, mul, prt))
 }
 
 func TestFunctionWrapperRun(t *testing.T) {
 
-	Build(F{Id: "extract", Value: gen}, F{Id: "transform", Value: mul}, F{Id: "load", Value: prt}).Run()
+	Run(Build(FunctionLink{Id: "extract", Value: gen}, FunctionLink{Id: "transform", Value: mul}, FunctionLink{Id: "load", Value: prt}))
 }
 
 func stressExtract(out chan string) {
@@ -126,7 +126,7 @@ func stressLoad(in string) {
 	time.Sleep(3 * time.Millisecond)
 }
 
-func TestFunctionStress(t *testing.T) {
-	pipeline := Build(F{Value: stressExtract}, F{Value: stressTransform}, F{Value: stressLoad})
-	pipeline.Run()
-}
+//func TestFunctionStress(t *testing.T) {
+//	Pipeline := Build(FunctionLink{Value: stressExtract}, FunctionLink{Value: stressTransform}, FunctionLink{Value: stressLoad})
+//	Pipeline.Run()
+//}

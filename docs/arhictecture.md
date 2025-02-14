@@ -5,6 +5,15 @@
 1. [Defining Pipelines In Code](#1-defining-pipelines-in-code)
 2. [Multithreading](#2-multithreading)
 
+```mermaid
+classDiagram
+    Pipeline "1" *-- "1..*" pPipeline
+    Pipeline "1" *-- "1..*" pFunction
+    Pipeline "*" .. "1" Metadata
+    class Pipeline {
+        +String test
+    }
+```
 ### Structures
 
 **Branch**
