@@ -9,7 +9,7 @@ import (
 const maximumGoroutinesPerFunction = 1000
 
 // Metadata
-// is a wrapper type containing a set of function pointers used in a
+// is a channelDataWrapper type containing a set of function pointers used in a
 // Pipeline and a configuration description of the Pipeline.
 type Metadata struct {
 	Pipeline  PipelineMetadata

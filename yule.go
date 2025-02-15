@@ -45,8 +45,8 @@ func build(branches ...*Branch) (Pipeline, error) {
 }
 
 // buildLinear
-// is a wrapper function to generate a branch from a set of functions. Instead
-// of requiring the developer to write bloated code, the wrapper function can
+// is a channelDataWrapper function to generate a branch from a set of functions. Instead
+// of requiring the developer to write bloated code, the channelDataWrapper function can
 // be used for simplistic functions that represent a line rather than tree.
 func buildLinear(functions ...any) (Pipeline, error) {
 
@@ -94,7 +94,7 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 			iType = invalidType
 		}
 
-		// state machine determining whether the provided parameters are valid
+		// cStatus machine determining whether the provided parameters are valid
 		switch variant {
 		case functionVariant:
 			{
@@ -105,7 +105,7 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 		case functionWrapperVariant:
 			{
 				if iType != functionWrapperType {
-					log.Panicf("the parameter at index %d is not a function wrapper\n", idx)
+					log.Panicf("the parameter at index %d is not a function channelDataWrapper\n", idx)
 				}
 			}
 		case branchVariant:

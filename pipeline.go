@@ -91,7 +91,7 @@ func buildPChannel(config pChannelConfig) (*pChannel, error) {
 	newChan.Config.Threshold = config.p.Threshold
 	newChan.Config.GrowthFactor = config.p.GrowthFactor
 	newChan.Stats = config.s
-	newChan.Value = New(newChan.Identifier, config.p.Threshold, config.p.GrowthFactor, &config.s.Timing)
+	newChan.Value = newManagedChannel(newChan.Identifier, config.p.Threshold, config.p.GrowthFactor, &config.s.Timing)
 	newChan.Receiver = make([]*pFunction, 0)
 	newChan.Producers = make([]*pFunction, 0)
 

@@ -8,7 +8,7 @@ import (
 var IsNotFunc = errors.New("passed value must be of type function")
 
 // Step
-// is a wrapper to associate a function to a string identifier.
+// is a channelDataWrapper to associate a function to a string identifier.
 type Step struct {
 	id    string
 	value any

@@ -24,7 +24,7 @@ const (
 )
 
 // runStatus
-// represents the current state of the pipeline.
+// represents the current cStatus of the pipeline.
 type runStatus string
 
 const (
@@ -90,7 +90,7 @@ const (
 // is a container that holds all values used by a running instance of a Pipeline.
 type pipelineRuntime struct {
 	Id     uint64    `json:"id"`     // a unique identifier for the pipeline instance.
-	Status runStatus `json:"status"` // the state of the pipeline
+	Status runStatus `json:"status"` // the cStatus of the pipeline
 
 	Pipeline Pipeline // each pipeline has zero to many pipelineRuntime instances
 
@@ -105,7 +105,7 @@ type pipelineRuntime struct {
 	}
 
 	mutex struct {
-		global         sync.RWMutex // ensures that the state machine is treated as a critical section
+		global         sync.RWMutex // ensures that the cStatus machine is treated as a critical section
 		threadCreation sync.Mutex   // ensure that thread creations is treated as a critical section
 	}
 }
@@ -290,7 +290,7 @@ func (instance *pipelineRuntime) start() error {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-////					pipelineRuntime State Machine						////
+////					pipelineRuntime cStatus Machine						////
 ////////////////////////////////////////////////////////////////////////////////
 
 func (instance *pipelineRuntime) event(event runEvent) bool {
@@ -423,7 +423,7 @@ func (instance *pipelineRuntime) extractShutdownWrapper() <-chan struct{} {
 var errorInterface = reflect.TypeOf((*error)(nil)).Elem()
 
 // call
-// a wrapper function that checks the returned values from a function call for
+// a channelDataWrapper function that checks the returned values from a function call for
 // error values. if the function returns an error that is non-nil we will set
 // the returned boolean flag to true indicating something may have gone wrong
 // inside the function call.
@@ -528,7 +528,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 			}
 
 			// TODO : reword
-			// if the producer function has output, then don't worry about spawning a wrapper,
+			// if the producer function has output, then don't worry about spawning a channelDataWrapper,
 			// allow the function to return normally and send the data along the pipe
 
 			if function.Reflected.Type.NumOut() > 0 {
@@ -591,7 +591,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 
 			for {
 				select {
-				case request := <-function.From.Value.GetChannel():
+				case request := <-function.From.Value.channel:
 					{
 						if request.IsInvalid() {
 							closeChan = true
@@ -679,7 +679,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 
 			for {
 				select {
-				case request := <-function.From.Value.GetChannel():
+				case request := <-function.From.Value.channel:
 					{
 						// sometimes we are receiving bad data?
 						if request.IsInvalid() {

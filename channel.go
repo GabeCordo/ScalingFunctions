@@ -1,20 +1,17 @@
 package yule
 
 import (
-	"fmt"
 	"reflect"
 	"sync"
 	"time"
 )
 
-type BadManagedChannelType struct {
-	description string
-}
+// defaultQueueSize
+// represents the pre allocated size of channels upon initialization.
+const defaultQueueSize = 10000
 
-func (bmce BadManagedChannelType) Error() string {
-	return bmce.description
-}
-
+// channelStatus
+// represents the cStatus of the channel.
 type channelStatus int
 
 const (
@@ -26,69 +23,8 @@ const (
 	Closed
 )
 
-const QueueSize = 10000
-
-type managedChannelConfig struct {
-	Threshold              int
-	UnderutilizedThreshold int
-	GrowthFactor           float64
-}
-
-type wrapper struct {
-	In   time.Time
-	Data []reflect.Value
-}
-
-func (w wrapper) IsInvalid() bool {
-	return w.In.IsZero() || w.Data == nil
-}
-
-type managedChannel struct {
-	Name string
-
-	State  channelStatus
-	Size   int
-	Config managedChannelConfig
-
-	Statistics     *TimingStatistics
-	TotalProcessed int
-
-	channel chan wrapper
-
-	LastPush               time.Time
-	UnderutilizedThreshold int
-	StopNewPushes          bool
-	ChannelFinished        bool
-
-	NumOfProducers int
-
-	producerMux sync.RWMutex
-	sizeMux     sync.Mutex
-
-	wg sync.WaitGroup
-}
-
-func New(name string, threshold int, growth float64, stats *TimingStatistics) *managedChannel {
-	mc := new(managedChannel)
-
-	mc.Name = name
-	mc.Config.Threshold = threshold
-	mc.Config.GrowthFactor = growth
-	mc.TotalProcessed = 0
-
-	// allocate size(wrapper) * QueueSize in advance to accommodate
-	// the incoming data to the channel
-	mc.channel = make(chan wrapper, QueueSize)
-	mc.Config.UnderutilizedThreshold = mc.Config.Threshold / 3
-	mc.Statistics = stats
-
-	mc.ChannelFinished = false
-	mc.StopNewPushes = false
-	mc.NumOfProducers = 0
-
-	return mc
-}
-
+// ToString
+// converts channelStatus into a human-readable string.
 func (status channelStatus) ToString() string {
 
 	switch status {
@@ -103,26 +39,88 @@ func (status channelStatus) ToString() string {
 	}
 }
 
-func (mc *managedChannel) GetChannel() chan wrapper {
-	return mc.channel
+type managedChannelConfig struct {
+	Threshold              int
+	UnderutilizedThreshold int
+	GrowthFactor           float64
+}
+
+type channelDataWrapper struct {
+	In   time.Time
+	Data []reflect.Value
+}
+
+func (w channelDataWrapper) IsInvalid() bool {
+	return w.In.IsZero() || w.Data == nil
+}
+
+type managedChannel struct {
+	Name string
+
+	cStatus channelStatus
+	cSize   int
+
+	Config managedChannelConfig
+
+	Statistics             *TimingStatistics
+	LastPush               time.Time
+	UnderutilizedThreshold int
+	TotalProcessed         int
+	NumOfProducers         int
+
+	channel chan channelDataWrapper
+
+	cFlags struct {
+		stopNewPushes   bool
+		channelFinished bool
+	}
+
+	cMutexes struct {
+		producer sync.RWMutex
+		size     sync.Mutex
+	}
+
+	wg sync.WaitGroup
+}
+
+func newManagedChannel(name string, threshold int, growth float64, stats *TimingStatistics) *managedChannel {
+
+	mc := new(managedChannel)
+
+	mc.Name = name
+	mc.Config.Threshold = threshold
+	mc.Config.GrowthFactor = growth
+	mc.TotalProcessed = 0
+
+	// allocate size(channelDataWrapper) * defaultQueueSize in advance to accommodate
+	// the incoming data to the channel
+	mc.channel = make(chan channelDataWrapper, defaultQueueSize)
+	mc.Config.UnderutilizedThreshold = mc.Config.Threshold / 3
+	mc.Statistics = stats
+
+	mc.cFlags.channelFinished = false
+	mc.cFlags.stopNewPushes = false
+	mc.NumOfProducers = 0
+
+	return mc
 }
 
 func (mc *managedChannel) Push(data []reflect.Value) bool {
 
-	mc.sizeMux.Lock()
+	mc.cMutexes.size.Lock()
 
 	// don't push to the channel if it is supposed to be closed
-	if mc.StopNewPushes {
+	if mc.cFlags.stopNewPushes {
 		return false
 	}
 
 	// see if we are hitting a threshold and the successive function is
 	// getting overloaded with data units
-	if (mc.Size + 1) >= mc.Config.Threshold {
-		mc.State = Congested
+	if (mc.cSize + 1) >= mc.Config.Threshold {
+		mc.cStatus = Congested
 	}
 
-	mc.Size++
+	mc.cSize++
 	mc.TotalProcessed++
 
 	currentTime := time.Now()
@@ -143,21 +141,21 @@ func (mc *managedChannel) Push(data []reflect.Value) bool {
 	//				since the producer is waiting to write to the channel and
 	//				the consumer can't continue pulling data off the queue we
 	//				enter an infinite deadlock!
-	mc.sizeMux.Unlock()
+	mc.cMutexes.size.Unlock()
 
 	if data == nil {
 		return false
 	}
 
-	mc.channel <- wrapper{In: currentTime, Data: data}
+	mc.channel <- channelDataWrapper{In: currentTime, Data: data}
 
 	return true
 }
 
 func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) {
 
-	mc.sizeMux.Lock()
-	defer mc.sizeMux.Unlock()
+	mc.cMutexes.size.Lock()
+	defer mc.cMutexes.size.Unlock()
 
 	timeOutOfQueue := time.Now()
 	totalTimeInQueue := timeOutOfQueue.Sub(timeIntoQueue)
@@ -176,71 +174,58 @@ func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) {
 		mc.Statistics.MinTimeBeforePop = totalTimeInQueue
 	}
 
-	mc.Size--
-	mc.State = mc.GetState()
+	mc.cSize--
+	mc.cStatus = mc.GetState()
 }
 
 func (mc *managedChannel) Accepting() bool {
-	return !mc.StopNewPushes
+	return !mc.cFlags.stopNewPushes
 }
 
 func (mc *managedChannel) StopPushes() {
-	mc.StopNewPushes = true
+	mc.cFlags.stopNewPushes = true
 }
 
 func (mc *managedChannel) AddProducer() {
-	mc.producerMux.Lock()
-	defer mc.producerMux.Unlock()
+	mc.cMutexes.producer.Lock()
+	defer mc.cMutexes.producer.Unlock()
 
 	mc.NumOfProducers++
 }
 
 func (mc *managedChannel) ProducerDone() {
 
-	mc.producerMux.Lock()
-	defer mc.producerMux.Unlock()
+	mc.cMutexes.producer.Lock()
+	defer mc.cMutexes.producer.Unlock()
 
 	mc.NumOfProducers--
 
-	if !mc.ChannelFinished && (mc.NumOfProducers <= 0) {
-		mc.ChannelFinished = true
+	if !mc.cFlags.channelFinished && (mc.NumOfProducers <= 0) {
+		mc.cFlags.channelFinished = true
 		close(mc.channel)
 	}
 }
 
 func (mc *managedChannel) GetState() channelStatus {
 
-	mc.producerMux.RLock()
-	defer mc.producerMux.RUnlock()
+	mc.cMutexes.producer.RLock()
+	defer mc.cMutexes.producer.RUnlock()
 
-	if mc.ChannelFinished {
-		mc.State = Closed
-	} else if mc.Size == 0 {
+	if mc.cFlags.channelFinished {
+		mc.cStatus = Closed
+	} else if mc.cSize == 0 {
 		if time.Now().Sub(mc.LastPush).Seconds() > 3 {
-			mc.State = Idle
+			mc.cStatus = Idle
 		} else {
-			mc.State = Empty
+			mc.cStatus = Empty
 		}
-	} else if ((mc.State == Congested) || (mc.State == Idle)) && (mc.Size < mc.Config.UnderutilizedThreshold) {
-		mc.State = Underutilized
-	} else if mc.Size > mc.Config.Threshold {
-		mc.State = Congested
+	} else if ((mc.cStatus == Congested) || (mc.cStatus == Idle)) && (mc.cSize < mc.Config.UnderutilizedThreshold) {
+		mc.cStatus = Underutilized
+	} else if mc.cSize > mc.Config.Threshold {
+		mc.cStatus = Congested
 	} else {
-		mc.State = Healthy
+		mc.cStatus = Healthy
 	}
 
-	return mc.State
-}
-
-func (mc *managedChannel) GetGrowthFactor() float64 {
-
-	return mc.Config.GrowthFactor
-}
-
-func (mc *managedChannel) AmountOfDataSeen() int {
-	return mc.TotalProcessed
-}
-
-func (mc *managedChannel) ToString() string {
-	return fmt.Sprintf("[%s][%s][Size: %d]\n", mc.Name, mc.State.ToString(), mc.Size)
+	return mc.cStatus
 }
