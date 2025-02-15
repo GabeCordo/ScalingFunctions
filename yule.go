@@ -193,9 +193,10 @@ func Build(input ...any) (pipeline Pipeline) {
 
 func Run(pipeline Pipeline, injectables ...any) error {
 
-	m := make(map[string]string)
-	runtime := newPipelineRuntime(pipeline, m, injectables...)
-	return runtime.start(false)
+	runtime := newPipelineRuntime(pipeline)
+	runtime.injectDependencies(injectables...)
+
+	return runtime.start()
 }
 
 type TestReport struct {
@@ -206,14 +207,17 @@ type TestReport struct {
 
 func Test(pipeline Pipeline, data any, injectables ...any) TestReport {
 
-	m := make(map[string]string)
-	runtime := newPipelineRuntime(pipeline, m, injectables...)
+	runtime := newPipelineRuntime(pipeline)
+	runtime.injectDependencies(injectables...)
+
+	// instructs pipeline to enable testing
+	runtime.isForTesting()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
 	go func() {
-		runtime.start(true)
+		runtime.start()
 		wg.Done()
 	}()
 
@@ -227,14 +231,17 @@ func Test(pipeline Pipeline, data any, injectables ...any) TestReport {
 
 func TestAs(pipeline Pipeline, f string, data any, injectables ...any) TestReport {
 
-	m := make(map[string]string)
-	runtime := newPipelineRuntime(pipeline, m, injectables...)
+	runtime := newPipelineRuntime(pipeline)
+	runtime.injectDependencies(injectables...)
+
+	// instructs pipeline to enable testing
+	runtime.isForTesting()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
 	go func() {
-		runtime.start(true)
+		runtime.start()
 		wg.Done()
 	}()
 

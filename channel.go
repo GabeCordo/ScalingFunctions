@@ -23,6 +23,7 @@ const (
 	Healthy
 	Underutilized
 	Congested
+	Closed
 )
 
 const QueueSize = 10000
@@ -61,7 +62,7 @@ type managedChannel struct {
 
 	NumOfProducers int
 
-	producerMux sync.Mutex
+	producerMux sync.RWMutex
 	sizeMux     sync.Mutex
 
 	wg sync.WaitGroup
@@ -209,7 +210,12 @@ func (mc *managedChannel) ProducerDone() {
 
 func (mc *managedChannel) GetState() channelStatus {
 
-	if mc.Size == 0 {
+	mc.producerMux.RLock()
+	defer mc.producerMux.RUnlock()
+
+	if mc.ChannelFinished {
+		mc.State = Closed
+	} else if mc.Size == 0 {
 		if time.Now().Sub(mc.LastPush).Seconds() > 3 {
 			mc.State = Idle
 		} else {

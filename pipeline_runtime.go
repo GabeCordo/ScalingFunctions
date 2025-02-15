@@ -2,22 +2,29 @@
 //
 // Copyright (c) 2024-2025. Gabriel Cordovado
 // All rights reserved.
+//
+// Source file:  pipeline_runtime.go
 package yule
 
 import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"reflect"
 	"sync"
 	"time"
 )
 
+////////////////////////////////////////////////////////////////////////////////
+////							Constants									////
+////////////////////////////////////////////////////////////////////////////////
+
 const (
 	defaultMonitorRefreshDuration = 100
 )
 
+// runStatus
+// represents the current state of the pipeline.
 type runStatus string
 
 const (
@@ -50,6 +57,8 @@ func (status runStatus) ToString() string {
 	}
 }
 
+// runEvent
+// represents an event that can be pushed to the pipeline.
 type runEvent uint8
 
 const (
@@ -64,6 +73,8 @@ const (
 	EndReport
 )
 
+// functionTerminationCause
+// represents the reason function execution was stopped.
 type functionTerminationCause uint8
 
 const (
@@ -71,30 +82,37 @@ const (
 	Forced
 )
 
-const MaximumRoutinesPerSupervisor = 2000
+////////////////////////////////////////////////////////////////////////////////
+////						   pipelineRuntime								////
+////////////////////////////////////////////////////////////////////////////////
 
+// pipelineRuntime
+// is a container that holds all values used by a running instance of a Pipeline.
 type pipelineRuntime struct {
-	Id uint64 `json:"id"`
+	Id     uint64    `json:"id"`     // a unique identifier for the pipeline instance.
+	Status runStatus `json:"status"` // the state of the pipeline
 
-	State     runStatus `json:"status"`
-	StartTime time.Time `json:"quitE-time"`
+	Pipeline Pipeline // each pipeline has zero to many pipelineRuntime instances
 
-	Pipeline         Pipeline
-	metadata         map[string]string
 	injectables      []reflect.Value
 	numOfInjectables int
 
 	testing       bool
 	testingReport TestReport
 
-	startingWaitGroup sync.WaitGroup
-	loadWaitGroup     sync.WaitGroup
-	waitGroup         sync.WaitGroup
-	threadMutex       sync.Mutex
-	mutex             sync.RWMutex
+	waitGroup struct {
+		startup sync.WaitGroup // completes after the startup procedure has completed
+	}
+
+	mutex struct {
+		global         sync.RWMutex // ensures that the state machine is treated as a critical section
+		threadCreation sync.Mutex   // ensure that thread creations is treated as a critical section
+	}
 }
 
-func newPipelineRuntime(pipeline Pipeline, metadata map[string]string, injectables ...any) *pipelineRuntime {
+// newPipelineRuntime
+// builds a pipelineRuntime
+func newPipelineRuntime(pipeline Pipeline) *pipelineRuntime {
 	supervisor := new(pipelineRuntime)
 
 	/**
@@ -104,102 +122,34 @@ func newPipelineRuntime(pipeline Pipeline, metadata map[string]string, injectabl
 	 *       that "self improves" if the output of the monitor is looped back
 	 */
 
-	supervisor.State = UnTouched
+	supervisor.Status = UnTouched
 
 	supervisor.Pipeline = pipeline
-	supervisor.metadata = metadata
 
-	supervisor.injectables = make([]reflect.Value, len(injectables))
-	for idx, injectable := range injectables {
-		supervisor.injectables[idx] = reflect.ValueOf(injectable)
-	}
+	supervisor.testing = false
+
 	supervisor.numOfInjectables = len(supervisor.injectables)
-	supervisor.startingWaitGroup.Add(1)
+	supervisor.waitGroup.startup.Add(1)
 
 	return supervisor
 }
 
-func (instance *pipelineRuntime) event(event runEvent) bool {
-	instance.mutex.Lock()
-	defer instance.mutex.Unlock()
+func (instance *pipelineRuntime) injectDependencies(injectables ...any) {
 
-	if instance.State == UnTouched {
-		if event == Startup {
-			instance.State = Active
-		} else if (event == Suspend) || (event == TearedDown) {
-			instance.State = Stopping
-		} else {
-			return false
-		}
-	} else if instance.State == Active {
-		if event == StartProvision {
-			instance.State = Provisioning
-		} else if event == Error {
-			instance.State = Failed
-		} else if event == Suspend {
-			instance.State = Stopping
-		} else if event == TearedDown {
-			instance.State = Terminated
-		} else {
-			return false
-		}
-	} else if instance.State == Provisioning {
-		if event == EndProvision {
-			instance.State = Active
-		} else if event == Error {
-			instance.State = Failed
-		} else if event == Suspend {
-			instance.State = Stopping
-		} else {
-			return false
-		}
-	} else if instance.State == Stopping {
-		if event == TearedDown {
-			instance.State = Terminated
-		} else {
-			return false
-		}
-	} else if (instance.State == Failed) || (instance.State == Terminated) {
-		return false
+	instance.injectables = make([]reflect.Value, len(injectables))
+	for idx, injectable := range injectables {
+		instance.injectables[idx] = reflect.ValueOf(injectable)
 	}
-
-	return true // represents a boolean ~ hasStateChanged?
 }
 
-func (instance *pipelineRuntime) isAlive() bool {
-
-	instance.mutex.RLock()
-	defer instance.mutex.RUnlock()
-
-	return (instance.State != Failed) && (instance.State != Terminated)
+func (instance *pipelineRuntime) isForTesting() {
+	instance.testing = true
 }
 
-func (instance *pipelineRuntime) start(test bool) error {
-	instance.event(Startup)
+func (instance *pipelineRuntime) startup() error {
 
-	defer instance.event(TearedDown)
-
-	instance.testing = test
-
-	if DEBUG {
-		log.Printf("Starting instance with id: %d", instance.Id)
-	}
-
-	var err error = nil
-
-	defer func() {
-		// has the user defined function crashed during runtime?
-		if r := recover(); r != nil {
-			// yes => return a response that identifies that the cluster crashed
-			err = errors.New("crashed during runtime") // TODO : make into standard error
-		}
-	}()
-
-	instance.StartTime = time.Now()
-
+	// the startup function may optionally be provided by the developer.
 	if instance.Pipeline.OnStartup != nil {
-		// TODO : add safety check here
-
 		if DEBUG {
 			log.Println("Running OnStartup function")
 		}
@@ -208,76 +158,41 @@ func (instance *pipelineRuntime) start(test bool) error {
 		f.Call(instance.injectables)
 	}
 
-	//// add all the metadata passed to the Pipeline to the local environment
-
-	// TODO : possibly enhance security?
-	for key, value := range instance.metadata {
-
-		if DEBUG {
-			log.Printf("added new environment value '%s'\n", key)
-		}
-		os.Setenv(key, value)
-	}
-
-	//// start creating the default frontend goroutines
-
+	// provision each function in the pipeline that is required before
+	// data can begin flowing between functions in the pipeline.
 	for _, function := range instance.Pipeline.Functions {
 
 		for j := 0; (j < function.Config.StartWith) && (j < function.Config.Maximum); j++ {
 			instance.provision(function)
+
+			// note: these statistics are not run in parallel
+			//		 ~ there is not risk of a data race
 			function.Stats.Active++
 			function.Stats.Provisions++
 		}
 	}
 
-	//// end creating the default frontend goroutines
-
-	// every N seconds we should check if the ETChannel or TLChannel is congested
-	// and requires us to provision additional nodes
-	go instance.runtime()
-
-	instance.startingWaitGroup.Done() // allow actions that need to wait for startup to begin
-	instance.waitGroup.Wait()         // wait for the Extract-Transform-Load (ETL) Cycle to Complete
-
-	// calculate the timings produced by data being fed across each of the channels
-	// TODO: support
-	//instance.CalculateTiming()
-
-	//// cleanup environment variables that were dynamically set
-
-	for key, _ := range instance.metadata {
-
-		if DEBUG {
-			log.Printf("deleted environment value '%s'\n", key)
-		}
-		os.Unsetenv(key)
-	}
-
-	return err
+	return nil
 }
 
-func (instance *pipelineRuntime) teardown() {
-
-	// TODO : add a guard in case this value is not a function
-	if instance.Pipeline.OnStartup != nil {
-		f := reflect.ValueOf(instance.Pipeline.OnTeardown.Value)
-		f.Call(instance.injectables)
-	}
-
-	instance.event(Suspend)
-}
-
+// runtime
+// every N seconds we should check if the ETChannel or TLChannel is congested
+// and requires us to provision additional nodes.
 func (instance *pipelineRuntime) runtime() {
+
 	for {
-		if instance.State == Terminated {
+		// if the pipeline has been terminated we should end the
+		// runtime loop of checking the channels and scaling functions
+		if instance.Status == Terminated {
 			break
 		}
 
+		numOfClosedChannels := 0
 		for _, chn := range instance.Pipeline.Channels {
 
 			channelState := chn.Value.GetState()
 
-			if (instance.State == Stopping) && chn.Value.Accepting() {
+			if (instance.Status == Stopping) && chn.Value.Accepting() {
 				chn.Value.StopPushes()
 			}
 
@@ -310,13 +225,132 @@ func (instance *pipelineRuntime) runtime() {
 						n--
 					}
 				}
+			} else if channelState == Closed {
+				numOfClosedChannels++
 			}
+		}
+
+		// when all channels have been closed there is no reason
+		// to keep the execution loop running.
+		if numOfClosedChannels == len(instance.Pipeline.Channels) {
+			break
 		}
 
 		// check if the channel is congested after defaultMonitorRefreshDuration seconds
 		time.Sleep(defaultMonitorRefreshDuration * time.Millisecond)
 	}
 }
+
+func (instance *pipelineRuntime) teardown() {
+
+	// TODO : add a guard in case this value is not a function
+	if instance.Pipeline.OnStartup != nil {
+		f := reflect.ValueOf(instance.Pipeline.OnTeardown.Value)
+		f.Call(instance.injectables)
+	}
+
+	instance.event(Suspend)
+}
+
+func (instance *pipelineRuntime) start() error {
+	instance.event(Startup)
+	defer instance.event(TearedDown)
+
+	if DEBUG {
+		log.Printf("Starting instance with id: %d", instance.Id)
+	}
+
+	var err error = nil
+
+	defer func() {
+		// has the user defined function crashed during runtime?
+		if r := recover(); r != nil {
+			// yes => return a response that identifies that the cluster crashed
+			err = errors.New("crashed during runtime") // TODO : make into standard error
+		}
+	}()
+
+	//// start creating the default frontend goroutines
+
+	err = instance.startup()
+	if err != nil {
+		return err
+	}
+	instance.waitGroup.startup.Done() // allow actions that need to wait for startup to begin
+
+	//// end creating the default frontend goroutines
+
+	instance.runtime()
+
+	//instance.waitGroup.Wait() // wait for the Extract-Transform-Load (ETL) Cycle to Complete
+
+	instance.teardown()
+
+	return err
+}
+
+////////////////////////////////////////////////////////////////////////////////
+////					pipelineRuntime State Machine						////
+////////////////////////////////////////////////////////////////////////////////
+
+func (instance *pipelineRuntime) event(event runEvent) bool {
+	instance.mutex.global.Lock()
+	defer instance.mutex.global.Unlock()
+
+	if instance.Status == UnTouched {
+		if event == Startup {
+			instance.Status = Active
+		} else if (event == Suspend) || (event == TearedDown) {
+			instance.Status = Stopping
+		} else {
+			return false
+		}
+	} else if instance.Status == Active {
+		if event == StartProvision {
+			instance.Status = Provisioning
+		} else if event == Error {
+			instance.Status = Failed
+		} else if event == Suspend {
+			instance.Status = Stopping
+		} else if event == TearedDown {
+			instance.Status = Terminated
+		} else {
+			return false
+		}
+	} else if instance.Status == Provisioning {
+		if event == EndProvision {
+			instance.Status = Active
+		} else if event == Error {
+			instance.Status = Failed
+		} else if event == Suspend {
+			instance.Status = Stopping
+		} else {
+			return false
+		}
+	} else if instance.Status == Stopping {
+		if event == TearedDown {
+			instance.Status = Terminated
+		} else {
+			return false
+		}
+	} else if (instance.Status == Failed) || (instance.Status == Terminated) {
+		return false
+	}
+
+	return true // represents a boolean ~ hasStateChanged?
+}
+
+func (instance *pipelineRuntime) IsAlive() bool {
+
+	instance.mutex.global.RLock()
+	defer instance.mutex.global.RUnlock()
+
+	return (instance.Status != Failed) && (instance.Status != Terminated)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+////						   pipelineRuntime								////
+////////////////////////////////////////////////////////////////////////////////
 
 func (instance *pipelineRuntime) extractWrapper(function *pFunction, channel *managedChannel) <-chan struct{} {
 	done := make(chan struct{})
@@ -374,9 +408,9 @@ func (instance *pipelineRuntime) extractShutdownWrapper() <-chan struct{} {
 	go func() {
 		defer close(done)
 		for {
-			// the isAlive clause ensures that once a runner is dead, we will not leak memory
+			// the IsAlive clause ensures that once a runner is dead, we will not leak memory
 			// with a forever-running goroutine
-			if (instance.State == Stopping) || (!instance.isAlive()) {
+			if (instance.Status == Stopping) || (!instance.IsAlive()) {
 				break
 			}
 			time.Sleep(1 * time.Second)
@@ -446,18 +480,20 @@ func (instance *pipelineRuntime) call(function *pFunction, ins []reflect.Value) 
 	return results, drop
 }
 
+// provision
+// creates a new running instance of a pFunction.
 func (instance *pipelineRuntime) provision(function *pFunction) {
 	instance.event(StartProvision)
 	defer instance.event(EndProvision)
 
 	// the runner must provision new threads one at a time.
 	// note: avoid the possibility of >1 thread modifying the wait-group at a time
-	instance.threadMutex.Lock()
-	defer instance.threadMutex.Unlock()
+	instance.mutex.threadCreation.Lock()
+	defer instance.mutex.threadCreation.Unlock()
 
 	// a new function is provisioned
 	// we should inform the wait group that the runner isn't finished until the wg is done
-	instance.waitGroup.Add(1)
+	//instance.waitGroup.Add(1)
 
 	go func(supervisor *pipelineRuntime, function *pFunction) {
 
@@ -475,7 +511,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 					}
 					log.Println(err)
 					function.To.Value.ProducerDone()
-					supervisor.waitGroup.Done()
+					//supervisor.waitGroup.Done()
 				}
 			}()
 
@@ -537,7 +573,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 						instance.testingReport.Cause = err
 					}
 					log.Println(err)
-					supervisor.waitGroup.Done()
+					//supervisor.waitGroup.Done()
 				}
 			}()
 
@@ -618,7 +654,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 					}
 					log.Println(err)
 					function.To.Value.ProducerDone()
-					supervisor.waitGroup.Done()
+					//supervisor.waitGroup.Done()
 				}
 			}()
 
@@ -767,10 +803,12 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 		}
 
 		// notify the wait group a process has completed ~ if all are finished we close the monitor
-		supervisor.waitGroup.Done()
+		//supervisor.waitGroup.Done()
 	}(instance, function)
 }
 
+// remove
+// terminates a running instance of type pFunction.
 func (instance *pipelineRuntime) remove(function *pFunction) {
 
 	if function.Stats.Active <= 0 {
@@ -782,6 +820,10 @@ func (instance *pipelineRuntime) remove(function *pFunction) {
 	quit <- true
 }
 
+////////////////////////////////////////////////////////////////////////////////
+////			functions to send data to a pipelineRuntime					////
+////////////////////////////////////////////////////////////////////////////////
+
 func (instance *pipelineRuntime) send(data any, functionId ...string) {
 
 	specifiedFunction := len(functionId) > 0
@@ -792,7 +834,7 @@ func (instance *pipelineRuntime) send(data any, functionId ...string) {
 		panic("testing non-linear pipelines requires specifying which generator function is being stubbed")
 	}
 
-	instance.startingWaitGroup.Wait()
+	instance.waitGroup.startup.Wait()
 	instance.testingReport.Success = true
 
 	isDataSent := false
@@ -816,12 +858,11 @@ func (instance *pipelineRuntime) send(data any, functionId ...string) {
 
 func (instance *pipelineRuntime) close() {
 
-	instance.startingWaitGroup.Wait()
+	instance.waitGroup.startup.Wait()
 
 	for _, f := range instance.Pipeline.Roots {
 		f.Stats.Active--
 		f.To.Value.ProducerDone()
-		instance.waitGroup.Done()
 	}
 }
 

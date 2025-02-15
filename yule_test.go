@@ -49,9 +49,9 @@ func TestBuildFrom(t *testing.T) {
 
 	d := PipelineMetadata{
 		Functions: []FunctionMetadata{
-			FunctionMetadata{Module: "common", Identifier: "gen", To: "0"},
-			FunctionMetadata{Module: "common", Identifier: "mul", From: "0", To: "1"},
-			FunctionMetadata{Module: "common", Identifier: "prt", From: "1"},
+			FunctionMetadata{Module: "common", Identifier: "gen", To: "0", StartWith: 1, Maximum: 1},
+			FunctionMetadata{Module: "common", Identifier: "mul", From: "0", To: "1", StartWith: 1, Maximum: 1},
+			FunctionMetadata{Module: "common", Identifier: "prt", From: "1", StartWith: 1, Maximum: 1},
 		},
 		Pipes: []PipeMetadata{
 			PipeMetadata{Identifier: "0", Threshold: 1, GrowthFactor: 2.0},
