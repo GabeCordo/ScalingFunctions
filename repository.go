@@ -3,7 +3,7 @@
 // Copyright (c) 2024-2025. Gabriel Cordovado
 // All rights reserved.
 //
-// Source file:  yule_repository.go
+// Source file:  repository.go
 package yule
 
 import (

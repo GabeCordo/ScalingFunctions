@@ -3,7 +3,7 @@
 // Copyright (c) 2024-2025. Gabriel Cordovado
 // All rights reserved.
 //
-// Source file:  pipeline_channel.go
+// Source file:  channel.go
 package yule
 
 import (

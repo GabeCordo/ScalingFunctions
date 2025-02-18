@@ -3,7 +3,7 @@
 // Copyright (c) 2024-2025. Gabriel Cordovado
 // All rights reserved.
 //
-// Source file:  yule_branch.go
+// Source file:  branch.go
 package yule
 
 import (
