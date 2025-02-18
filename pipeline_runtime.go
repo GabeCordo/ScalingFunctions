@@ -23,6 +23,10 @@ const (
 	defaultMonitorRefreshDuration = 100
 )
 
+////////////////////////////////////////////////////////////////////////////////
+////								Types									////
+////////////////////////////////////////////////////////////////////////////////
+
 // runStatus
 // represents the current cStatus of the pipeline.
 type runStatus string
@@ -149,18 +153,18 @@ func (instance *pipelineRuntime) isForTesting() {
 func (instance *pipelineRuntime) startup() error {
 
 	// the startup function may optionally be provided by the developer.
-	if instance.Pipeline.OnStartup != nil {
+	if instance.Pipeline.onStartup != nil {
 		if DEBUG {
-			log.Println("Running OnStartup function")
+			log.Println("Running onStartup function")
 		}
 
-		f := reflect.ValueOf(instance.Pipeline.OnStartup.Value)
+		f := reflect.ValueOf(instance.Pipeline.onStartup.Value)
 		f.Call(instance.injectables)
 	}
 
 	// provision each function in the pipeline that is required before
 	// data can begin flowing between functions in the pipeline.
-	for _, function := range instance.Pipeline.Functions {
+	for _, function := range instance.Pipeline.functions {
 
 		for j := 0; (j < function.Config.StartWith) && (j < function.Config.Maximum); j++ {
 			instance.provision(function)
@@ -188,7 +192,7 @@ func (instance *pipelineRuntime) runtime() {
 		}
 
 		numOfClosedChannels := 0
-		for _, chn := range instance.Pipeline.Channels {
+		for _, chn := range instance.Pipeline.channels {
 
 			channelState := chn.Value.GetState()
 
@@ -232,7 +236,7 @@ func (instance *pipelineRuntime) runtime() {
 
 		// when all channels have been closed there is no reason
 		// to keep the execution loop running.
-		if numOfClosedChannels == len(instance.Pipeline.Channels) {
+		if numOfClosedChannels == len(instance.Pipeline.channels) {
 			break
 		}
 
@@ -244,8 +248,8 @@ func (instance *pipelineRuntime) runtime() {
 func (instance *pipelineRuntime) teardown() {
 
 	// TODO : add a guard in case this value is not a function
-	if instance.Pipeline.OnStartup != nil {
-		f := reflect.ValueOf(instance.Pipeline.OnTeardown.Value)
+	if instance.Pipeline.onStartup != nil {
+		f := reflect.ValueOf(instance.Pipeline.onTeardown.Value)
 		f.Call(instance.injectables)
 	}
 
@@ -830,7 +834,7 @@ func (instance *pipelineRuntime) send(data any, functionId ...string) {
 
 	// the developer needs to specify which root they want to mimic
 	// when the Pipeline's topology is more complex than a linear line
-	if !specifiedFunction && (len(instance.Pipeline.Roots) > 1) {
+	if !specifiedFunction && (len(instance.Pipeline.roots) > 1) {
 		panic("testing non-linear pipelines requires specifying which generator function is being stubbed")
 	}
 
@@ -838,7 +842,7 @@ func (instance *pipelineRuntime) send(data any, functionId ...string) {
 	instance.testingReport.Success = true
 
 	isDataSent := false
-	for _, f := range instance.Pipeline.Roots {
+	for _, f := range instance.Pipeline.roots {
 
 		// do not push data to the Pipeline when the function identifier is
 		// specified and does not match.
@@ -860,7 +864,7 @@ func (instance *pipelineRuntime) close() {
 
 	instance.waitGroup.startup.Wait()
 
-	for _, f := range instance.Pipeline.Roots {
+	for _, f := range instance.Pipeline.roots {
 		f.Stats.Active--
 		f.To.Value.ProducerDone()
 	}

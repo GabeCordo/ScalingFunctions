@@ -2,6 +2,8 @@
 //
 // Copyright (c) 2024-2025. Gabriel Cordovado
 // All rights reserved.
+//
+// Source file:  pipeline.go
 package yule
 
 import (
@@ -9,10 +11,26 @@ import (
 	"sync"
 )
 
+////////////////////////////////////////////////////////////////////////
+//							Pipeline Types
+////////////////////////////////////////////////////////////////////////
+//
+//	Pipeline
+//		∟ pChannel
+//			∟ pChannelConfig  : used to build a pChannel
+//		∟ pFunction
+//			∟ pFunctionConfig : used to build a pFunction
+//
+////////////////////////////////////////////////////////////////////////
+
+type pInjectible struct {
+	value reflect.Value
+}
+
 // pChannelConfig
 // holds data required to build a pChannel.
 type pChannelConfig struct {
-	p *PipeMetadata
+	p *PipeIR
 	s *PipeStatistic
 }
 
@@ -36,8 +54,7 @@ type pChannel struct {
 // pFunctionConfig
 // holds data required to build a pFunction.
 type pFunctionConfig struct {
-	f        *FunctionMetadata
-	m        *FunctionLink
+	f        *FunctionIR
 	s        *FunctionStatistic
 	channels []*pChannel
 }
@@ -69,19 +86,32 @@ type pFunction struct {
 // Pipeline
 // represents a graph of pFunction and pChannel linked together.
 type Pipeline struct {
-	Identifier string
+	identifier string
 
-	Roots []*pFunction `json:"-"`
-	Tails []*pFunction
+	roots []*pFunction
+	tails []*pFunction
 
-	Channels  []*pChannel  `json:"-"`
-	Functions []*pFunction `json:"-"`
+	channels  []*pChannel
+	functions []*pFunction
 
-	OnStartup  *pFunction
-	OnTeardown *pFunction
+	onStartup  *pFunction
+	onTeardown *pFunction
 
-	Stats *Statistics
+	injected      []*pInjectible
+	numOfInjected int
+
+	stats *Statistics
 }
+
+////////////////////////////////////////////////////////////////////////
+//						Pipeline Build functions
+////////////////////////////////////////////////////////////////////////
+//
+//	buildPipeline
+//		∟ buildPChannel
+//		∟ buildPFunction
+//
+////////////////////////////////////////////////////////////////////////
 
 func buildPChannel(config pChannelConfig) (*pChannel, error) {
 
@@ -112,7 +142,7 @@ func buildPFunction(config pFunctionConfig) (*pFunction, error) {
 	function.Config.Maximum = config.f.Maximum
 	function.Stats = config.s
 	function.Quit = make([]chan bool, 0)
-	function.Value = config.m.Value
+	function.Value = config.f.value
 	function.Reflected.Value = reflect.ValueOf(function.Value)
 	function.Reflected.Type = reflect.TypeOf(function.Value)
 
@@ -133,37 +163,36 @@ func buildPFunction(config pFunctionConfig) (*pFunction, error) {
 	return function, nil
 }
 
-func buildPipeline(metadata *Metadata) (Pipeline, error) {
+func buildPipeline(iR *PipelineIR) (Pipeline, error) {
 
 	graph := Pipeline{}
-	graph.Identifier = metadata.Pipeline.Identifier
+	graph.identifier = iR.Identifier
 
 	// todo : this mem allocation should not be here
-	graph.Stats = NewStatistics(len(metadata.Pipeline.Functions), len(metadata.Pipeline.Pipes))
+	graph.stats = NewStatistics(len(iR.Functions), len(iR.Pipes))
 
-	graph.Channels = make([]*pChannel, len(metadata.Pipeline.Pipes))
-	for i, c := range metadata.Pipeline.Pipes {
+	graph.channels = make([]*pChannel, len(iR.Pipes))
+	for i, c := range iR.Pipes {
 		config := pChannelConfig{
 			p: &c,
-			s: &graph.Stats.Pipes[i],
+			s: &graph.stats.Pipes[i],
 		}
 		newChan, err := buildPChannel(config)
 		if err != nil {
 			return Pipeline{}, err
 		}
-		graph.Channels[i] = newChan
+		graph.channels[i] = newChan
 	}
 
-	graph.Roots = make([]*pFunction, 0)
-	graph.Tails = make([]*pFunction, 0)
-	graph.Functions = make([]*pFunction, len(metadata.Pipeline.Functions))
-	for i, f := range metadata.Pipeline.Functions {
+	graph.roots = make([]*pFunction, 0)
+	graph.tails = make([]*pFunction, 0)
+	graph.functions = make([]*pFunction, len(iR.Functions))
+	for i, f := range iR.Functions {
 
 		config := pFunctionConfig{
 			&f,
-			&metadata.Functions[i],
-			&graph.Stats.Functions[i],
-			graph.Channels,
+			&graph.stats.Functions[i],
+			graph.channels,
 		}
 		function, err := buildPFunction(config)
 		if err != nil {
@@ -171,23 +200,96 @@ func buildPipeline(metadata *Metadata) (Pipeline, error) {
 		}
 
 		if function.To == nil {
-			graph.Tails = append(graph.Tails, function)
+			graph.tails = append(graph.tails, function)
 		}
 
 		if function.From == nil {
-			graph.Roots = append(graph.Roots, function)
+			graph.roots = append(graph.roots, function)
 		}
 
-		if function.Identifier == metadata.Pipeline.OnStartup {
-			graph.OnStartup = function
+		if function.Identifier == iR.OnStartup {
+			graph.onStartup = function
 		}
 
-		if function.Identifier == metadata.Pipeline.OnTeardown {
-			graph.OnTeardown = function
+		if function.Identifier == iR.OnTeardown {
+			graph.onTeardown = function
 		}
 
-		graph.Functions[i] = function
+		graph.functions[i] = function
 	}
 
 	return graph, nil
+}
+
+////////////////////////////////////////////////////////////////////////
+//						Pipeline functions
+////////////////////////////////////////////////////////////////////////
+//
+//	Pipeline
+//		∟ .Run( ... )
+//		∟ .Test( data, ... )
+//		∟ .TestAs( channel_name, data, ... )
+//
+////////////////////////////////////////////////////////////////////////
+
+func (pipeline Pipeline) Run(injectables ...any) error {
+
+	runtime := newPipelineRuntime(pipeline)
+	runtime.injectDependencies(injectables...)
+
+	return runtime.start()
+}
+
+type TestReport struct {
+	Success bool   `json:"success"`
+	Step    string `json:"step"`
+	Cause   error  `json:"cause"`
+}
+
+func (pipeline Pipeline) Test(data any, injectables ...any) TestReport {
+
+	runtime := newPipelineRuntime(pipeline)
+	runtime.injectDependencies(injectables...)
+
+	// instructs pipeline to enable testing
+	runtime.isForTesting()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		runtime.start()
+		wg.Done()
+	}()
+
+	runtime.send(data)
+	runtime.close()
+
+	wg.Wait()
+
+	return runtime.testingReport
+}
+
+func (pipeline Pipeline) TestAs(f string, data any, injectables ...any) TestReport {
+
+	runtime := newPipelineRuntime(pipeline)
+	runtime.injectDependencies(injectables...)
+
+	// instructs pipeline to enable testing
+	runtime.isForTesting()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		runtime.start()
+		wg.Done()
+	}()
+
+	runtime.send(data, f)
+	runtime.close()
+
+	wg.Wait()
+
+	return runtime.testingReport
 }

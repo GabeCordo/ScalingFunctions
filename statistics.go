@@ -1,3 +1,9 @@
+// Package yule
+//
+// Copyright (c) 2024-2025. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  statistics.go
 package yule
 
 import (
@@ -37,7 +43,7 @@ type Statistics struct {
 func (s Statistics) Print() {
 
 	for idx, function := range s.Functions {
-		fmt.Printf("FunctionMetadata (%d):\n", idx)
+		fmt.Printf("FunctionIR (%d):\n", idx)
 		fmt.Printf("\tActive: %d\n\tProvisioned: %d\n", function.Active, function.Provisions)
 	}
 

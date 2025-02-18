@@ -1,11 +1,20 @@
+// Package yule
+//
+// Copyright (c) 2024-2025. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  yule.go
 package yule
 
 import (
 	"errors"
 	"log"
 	"reflect"
-	"sync"
 )
+
+////////////////////////////////////////////////////////////////////////
+//						  Yule Build Types
+////////////////////////////////////////////////////////////////////////
 
 // notableType
 // categorises and input to a lexeme.
@@ -32,16 +41,20 @@ const (
 	invalidVariant
 )
 
+////////////////////////////////////////////////////////////////////////
+//					    Yule Build functions
+////////////////////////////////////////////////////////////////////////
+
 // build
 // is a function to generate a RunnablePipeline instance from a set of
 // one to many Branch instances.
 func build(branches ...*Branch) (Pipeline, error) {
 
-	metadata, err := buildMetadata(branches...)
+	iR, err := buildPipelineIR(branches...)
 	if err != nil {
 		return Pipeline{}, err
 	}
-	return buildPipeline(metadata)
+	return buildPipeline(iR)
 }
 
 // buildLinear
@@ -59,9 +72,9 @@ func buildLinear(functions ...any) (Pipeline, error) {
 
 // buildFrom
 // is a function to generate a runnable Pipeline from Pipeline metadata and repository.
-func buildFrom(deployment *PipelineMetadata, repository *Repository) (Pipeline, error) {
+func buildFrom(deployment *PipelineIR, repository *Repository) (Pipeline, error) {
 
-	metadata, err := buildMetadataFrom(deployment, repository)
+	metadata, err := buildPipelineIRFrom(deployment, repository)
 	if err != nil {
 		return Pipeline{}, err
 	}
@@ -84,7 +97,7 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 			iType = branchType
 		} else if _, ok = input.(*Repository); ok {
 			iType = repositoryType
-		} else if _, ok = input.(*PipelineMetadata); ok {
+		} else if _, ok = input.(*PipelineIR); ok {
 			iType = deploymentType
 		} else if _, ok = input.(FunctionLink); ok {
 			iType = functionWrapperType
@@ -143,6 +156,17 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 	return variant
 }
 
+////////////////////////////////////////////////////////////////////////
+//						Yule Public functions
+////////////////////////////////////////////////////////////////////////
+//
+//	Build( ... )
+//		∟ Pipeline  : a runnable instance of the pipeline description
+//			.Run()  : begins execution of the pipeline
+//			.Test() : integration test on data passing through the pipeline
+//
+////////////////////////////////////////////////////////////////////////
+
 // Build
 // is a function to create a RunnablePipeline instance from a set of branches or functions.
 //
@@ -174,7 +198,7 @@ func Build(input ...any) (pipeline Pipeline) {
 		}
 	case configVariant:
 		{
-			d := (input[0]).(*PipelineMetadata)
+			d := (input[0]).(*PipelineIR)
 			r := (input[1]).(*Repository)
 			pipeline, err = buildFrom(d, r)
 		}
@@ -189,66 +213,4 @@ func Build(input ...any) (pipeline Pipeline) {
 	}
 
 	return pipeline
-}
-
-func Run(pipeline Pipeline, injectables ...any) error {
-
-	runtime := newPipelineRuntime(pipeline)
-	runtime.injectDependencies(injectables...)
-
-	return runtime.start()
-}
-
-type TestReport struct {
-	Success bool   `json:"success"`
-	Step    string `json:"step"`
-	Cause   error  `json:"cause"`
-}
-
-func Test(pipeline Pipeline, data any, injectables ...any) TestReport {
-
-	runtime := newPipelineRuntime(pipeline)
-	runtime.injectDependencies(injectables...)
-
-	// instructs pipeline to enable testing
-	runtime.isForTesting()
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		runtime.start()
-		wg.Done()
-	}()
-
-	runtime.send(data)
-	runtime.close()
-
-	wg.Wait()
-
-	return runtime.testingReport
-}
-
-func TestAs(pipeline Pipeline, f string, data any, injectables ...any) TestReport {
-
-	runtime := newPipelineRuntime(pipeline)
-	runtime.injectDependencies(injectables...)
-
-	// instructs pipeline to enable testing
-	runtime.isForTesting()
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		runtime.start()
-		wg.Done()
-	}()
-
-	runtime.send(data, f)
-	runtime.close()
-
-	wg.Wait()
-
-	return runtime.testingReport
 }

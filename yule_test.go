@@ -1,3 +1,9 @@
+// Package yule
+//
+// Copyright (c) 2024-2025. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  yule_test.go
 package yule
 
 import (
@@ -47,15 +53,15 @@ func TestBranchBuild(t *testing.T) {
 
 func TestBuildFrom(t *testing.T) {
 
-	d := PipelineMetadata{
-		Functions: []FunctionMetadata{
-			FunctionMetadata{Module: "common", Identifier: "gen", To: "0", StartWith: 1, Maximum: 1},
-			FunctionMetadata{Module: "common", Identifier: "mul", From: "0", To: "1", StartWith: 1, Maximum: 1},
-			FunctionMetadata{Module: "common", Identifier: "prt", From: "1", StartWith: 1, Maximum: 1},
+	d := PipelineIR{
+		Functions: []FunctionIR{
+			FunctionIR{Module: "common", Identifier: "gen", To: "0", StartWith: 1, Maximum: 1},
+			FunctionIR{Module: "common", Identifier: "mul", From: "0", To: "1", StartWith: 1, Maximum: 1},
+			FunctionIR{Module: "common", Identifier: "prt", From: "1", StartWith: 1, Maximum: 1},
 		},
-		Pipes: []PipeMetadata{
-			PipeMetadata{Identifier: "0", Threshold: 1, GrowthFactor: 2.0},
-			PipeMetadata{Identifier: "1", Threshold: 1, GrowthFactor: 2.0},
+		Pipes: []PipeIR{
+			PipeIR{Identifier: "0", Threshold: 1, GrowthFactor: 2.0},
+			PipeIR{Identifier: "1", Threshold: 1, GrowthFactor: 2.0},
 		},
 	}
 
@@ -66,29 +72,29 @@ func TestBuildFrom(t *testing.T) {
 		"prt": prt,
 	})
 
-	Run(Build(&d, r))
+	Build(&d, r).Run()
 }
 
 func TestBranchRun(t *testing.T) {
 
 	b := NewBranch().Add(gen).Add(mul).Add(prt)
-	Run(Build(b))
+	Build(b).Run()
 }
 
 func TestBranchWrapperRun(t *testing.T) {
 
 	b := NewBranch().Add(FunctionLink{Id: "extract", Value: gen}).Add(FunctionLink{Id: "transform", Value: mul}).Add(FunctionLink{Id: "load", Value: prt})
-	Run(Build(b))
+	Build(b).Run()
 }
 
 func TestFunctionRun(t *testing.T) {
 
-	Run(Build(gen, mul, prt))
+	Build(gen, mul, prt).Run()
 }
 
 func TestFunctionWrapperRun(t *testing.T) {
 
-	Run(Build(FunctionLink{Id: "extract", Value: gen}, FunctionLink{Id: "transform", Value: mul}, FunctionLink{Id: "load", Value: prt}))
+	Build(FunctionLink{Id: "extract", Value: gen}, FunctionLink{Id: "transform", Value: mul}, FunctionLink{Id: "load", Value: prt}).Run()
 }
 
 func stressExtract(out chan string) {
