@@ -367,19 +367,19 @@ func (instance *pipelineRuntime) extractWrapper(function *pFunction, channel *ma
 			close(done)
 		}()
 
-		numOfInjectibles := len(instance.injectables)
-		arguments := make([]reflect.Value, numOfInjectibles)
+		numberInjectables := len(instance.injectables)
+		arguments := make([]reflect.Value, numberInjectables)
 		copy(arguments, instance.injectables)
 
 		// the first parameter of an extract function that is not an injectable
 		// shall be a channel that the function can push extracted data to
-		if (function.Reflected.Type.NumIn() - numOfInjectibles) > 0 {
+		if (function.Reflected.Type.NumIn() - numberInjectables) > 0 {
 
 			// do we expect to pass a pipe?
-			channelType := function.Reflected.Type.In(numOfInjectibles)
+			channelType := function.Reflected.Type.In(numberInjectables)
 
 			if channelType.Kind() == reflect.Chan {
-				c := reflect.MakeChan(channelType, numOfInjectibles)
+				c := reflect.MakeChan(channelType, numberInjectables)
 				arguments = append(arguments, c)
 			}
 		}
@@ -389,10 +389,10 @@ func (instance *pipelineRuntime) extractWrapper(function *pFunction, channel *ma
 		// as the extract function runs asynchronously and sends data to the
 		// channel, receive data from the channel and push data to the next
 		// function in the Pipeline sequence.
-		if (function.Reflected.Type.NumIn() - numOfInjectibles) > 0 {
+		if (function.Reflected.Type.NumIn() - numberInjectables) > 0 {
 
 			for {
-				value, ok := arguments[numOfInjectibles].Recv()
+				value, ok := arguments[numberInjectables].Recv()
 				if ok {
 					channel.Push([]reflect.Value{value})
 				} else {

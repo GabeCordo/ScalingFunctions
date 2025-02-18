@@ -41,6 +41,12 @@ const (
 	invalidVariant
 )
 
+type F struct {
+	Id    string
+	Max   int
+	Value any
+}
+
 ////////////////////////////////////////////////////////////////////////
 //					    Yule Build functions
 ////////////////////////////////////////////////////////////////////////
@@ -99,7 +105,7 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 			iType = repositoryType
 		} else if _, ok = input.(*PipelineIR); ok {
 			iType = deploymentType
-		} else if _, ok = input.(FunctionLink); ok {
+		} else if _, ok = input.(F); ok {
 			iType = functionWrapperType
 		} else if reflect.TypeOf(input).Kind() == reflect.Func {
 			iType = functionType

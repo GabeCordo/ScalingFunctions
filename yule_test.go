@@ -83,7 +83,7 @@ func TestBranchRun(t *testing.T) {
 
 func TestBranchWrapperRun(t *testing.T) {
 
-	b := NewBranch().Add(FunctionLink{Id: "extract", Value: gen}).Add(FunctionLink{Id: "transform", Value: mul}).Add(FunctionLink{Id: "load", Value: prt})
+	b := NewBranch().Add(F{Id: "extract", Value: gen}).Add(F{Id: "transform", Value: mul}).Add(F{Id: "load", Value: prt})
 	Build(b).Run()
 }
 
@@ -94,7 +94,7 @@ func TestFunctionRun(t *testing.T) {
 
 func TestFunctionWrapperRun(t *testing.T) {
 
-	Build(FunctionLink{Id: "extract", Value: gen}, FunctionLink{Id: "transform", Value: mul}, FunctionLink{Id: "load", Value: prt}).Run()
+	Build(F{Id: "extract", Value: gen}, F{Id: "transform", Value: mul}, F{Id: "load", Value: prt}).Run()
 }
 
 func stressExtract(out chan string) {

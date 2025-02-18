@@ -100,7 +100,7 @@ type Pipeline struct {
 	injected      []*pInjectible
 	numOfInjected int
 
-	stats *Statistics
+	Stats *Statistics
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -169,13 +169,13 @@ func buildPipeline(iR *PipelineIR) (Pipeline, error) {
 	graph.identifier = iR.Identifier
 
 	// todo : this mem allocation should not be here
-	graph.stats = NewStatistics(len(iR.Functions), len(iR.Pipes))
+	graph.Stats = NewStatistics(len(iR.Functions), len(iR.Pipes))
 
 	graph.channels = make([]*pChannel, len(iR.Pipes))
 	for i, c := range iR.Pipes {
 		config := pChannelConfig{
 			p: &c,
-			s: &graph.stats.Pipes[i],
+			s: &graph.Stats.Pipes[i],
 		}
 		newChan, err := buildPChannel(config)
 		if err != nil {
@@ -191,7 +191,7 @@ func buildPipeline(iR *PipelineIR) (Pipeline, error) {
 
 		config := pFunctionConfig{
 			&f,
-			&graph.stats.Functions[i],
+			&graph.Stats.Functions[i],
 			graph.channels,
 		}
 		function, err := buildPFunction(config)

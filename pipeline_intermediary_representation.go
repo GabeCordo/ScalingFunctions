@@ -66,12 +66,6 @@ type PipelineIR struct {
 	OnTeardown string       `json:"on_teardown" yaml:"on_teardown,omitempty"`
 }
 
-type FunctionLink struct {
-	Id    string
-	Max   int
-	Value any
-}
-
 ////////////////////////////////////////////////////////////////////////
 //			Pipeline Intermediary Representation Functions
 ////////////////////////////////////////////////////////////////////////
