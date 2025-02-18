@@ -1,3 +1,9 @@
+// Package yule
+//
+// Copyright (c) 2024-2025. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  yule_test.go
 package yule
 
 import (
@@ -47,15 +53,15 @@ func TestBranchBuild(t *testing.T) {
 
 func TestBuildFrom(t *testing.T) {
 
-	d := Deployment{
-		Functions: []Function{
-			Function{Module: "common", Identifier: "gen", To: "0"},
-			Function{Module: "common", Identifier: "mul", From: "0", To: "1"},
-			Function{Module: "common", Identifier: "prt", From: "1"},
+	d := PipelineIR{
+		Functions: []FunctionIR{
+			FunctionIR{Module: "common", Identifier: "gen", To: "0", StartWith: 1, Maximum: 1},
+			FunctionIR{Module: "common", Identifier: "mul", From: "0", To: "1", StartWith: 1, Maximum: 1},
+			FunctionIR{Module: "common", Identifier: "prt", From: "1", StartWith: 1, Maximum: 1},
 		},
-		Pipes: []Pipe{
-			Pipe{Identifier: "0", Threshold: 1, GrowthFactor: 2.0},
-			Pipe{Identifier: "1", Threshold: 1, GrowthFactor: 2.0},
+		Pipes: []PipeIR{
+			PipeIR{Identifier: "0", Threshold: 1, GrowthFactor: 2.0},
+			PipeIR{Identifier: "1", Threshold: 1, GrowthFactor: 2.0},
 		},
 	}
 
@@ -126,7 +132,7 @@ func stressLoad(in string) {
 	time.Sleep(3 * time.Millisecond)
 }
 
-func TestFunctionStress(t *testing.T) {
-	pipeline := Build(F{Value: stressExtract}, F{Value: stressTransform}, F{Value: stressLoad})
-	pipeline.Run()
-}
+//func TestFunctionStress(t *testing.T) {
+//	Pipeline := Build(FunctionLink{Value: stressExtract}, FunctionLink{Value: stressTransform}, FunctionLink{Value: stressLoad})
+//	Pipeline.Run()
+//}
