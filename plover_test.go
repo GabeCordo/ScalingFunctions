@@ -1,10 +1,10 @@
-// Package yule
+// Package plover
 //
 // Copyright (c) 2024-2025. Gabriel Cordovado
 // All rights reserved.
 //
-// Source file:  yule_test.go
-package yule
+// Source file:  plover_test.go
+package plover
 
 import (
 	"errors"

@@ -1,10 +1,10 @@
-// Package yule
+// Package plover
 //
 // Copyright (c) 2024-2025. Gabriel Cordovado
 // All rights reserved.
 //
 // Source file:  branch.go
-package yule
+package plover
 
 import (
 	"errors"
@@ -31,6 +31,14 @@ type Branch struct {
 // is a collection of metadata that is bound to a function.
 type M struct {
 	id string
+}
+
+// F
+// is metadata tightly coupled with a function.
+type F struct {
+	Id    string
+	Max   int
+	Value any
 }
 
 // Add

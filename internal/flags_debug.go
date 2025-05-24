@@ -2,6 +2,6 @@
 //go:build debug
 // +build debug
 
-package yule
+package internal
 
 const DEBUG = true

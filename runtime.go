@@ -1,10 +1,10 @@
-// Package yule
+// Package plover
 //
 // Copyright (c) 2024-2025. Gabriel Cordovado
 // All rights reserved.
 //
 // Source file:  runtime.go
-package yule
+package plover
 
 import (
 	"errors"
@@ -13,6 +13,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/GabeCordo/Plover/internal"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -154,7 +156,7 @@ func (instance *pipelineRuntime) startup() error {
 
 	// the startup function may optionally be provided by the developer.
 	if instance.Pipeline.onStartup != nil {
-		if DEBUG {
+		if internal.DEBUG {
 			log.Println("Running onStartup function")
 		}
 
@@ -260,7 +262,7 @@ func (instance *pipelineRuntime) start() error {
 	instance.event(Startup)
 	defer instance.event(TearedDown)
 
-	if DEBUG {
+	if internal.DEBUG {
 		log.Printf("Starting instance with id: %d", instance.Id)
 	}
 
@@ -463,7 +465,7 @@ func (instance *pipelineRuntime) call(function *pFunction, ins []reflect.Value) 
 			isNil := lastResult.IsNil()
 
 			if !isNil {
-				// the yule framework shall be responsible for displaying errors sent
+				// the plover framework shall be responsible for displaying errors sent
 				// by the Pipeline to avoid requiring the developer to handle and return
 				// the error which is considered an anti-pattern
 				log.Println(lastResult.Elem())
@@ -527,7 +529,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 
 			function.To.Value.AddProducer()
 
-			if DEBUG {
+			if internal.DEBUG {
 				log.Printf("creating new producer function %d\n", supervisor.Id)
 			}
 
@@ -581,7 +583,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 				}
 			}()
 
-			if DEBUG {
+			if internal.DEBUG {
 				log.Printf("creating new endpoint function %d\n", supervisor.Id)
 			}
 
@@ -669,7 +671,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 
 			function.To.Value.AddProducer()
 
-			if DEBUG {
+			if internal.DEBUG {
 				log.Printf("creating new transformer function %d\n", supervisor.Id)
 			}
 

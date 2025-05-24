@@ -1,8 +1,8 @@
-# Yule Framework
+# plover Framework
 
 An open source framework for building multithreaded data pipelines. 
 
-Yule provides fine-grained control over the deployment of vertically scalable pipelines to control: how they
+plover provides fine-grained control over the deployment of vertically scalable pipelines to control: how they
 are provisioned, how they should change with data fluctuations, and how they store statistics.
 
 ## Benchmarks

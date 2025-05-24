@@ -7,7 +7,7 @@
 
 ## Overview
 
-The **Build** function is the entrypoint of the yule framework.
+The **Build** function is the entrypoint of the plover framework.
 The caller invokes a **Build** function which transforms some input into an intermidiary representation that may be used to build a pipeline.
 
 

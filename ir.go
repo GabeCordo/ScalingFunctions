@@ -4,7 +4,7 @@
 // All rights reserved.
 //
 // Source file:  ir.go
-package yule
+package plover
 
 import (
 	"errors"

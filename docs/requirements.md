@@ -1,6 +1,6 @@
 # Requirements
 
-This markdown file acts as a reference for the requirements of the Yule Framework.
+This markdown file acts as a reference for the requirements of the plover Framework.
 
 ## Functional Requirements
 
