@@ -19,22 +19,22 @@ type TimingStatistics struct {
 }
 
 type FunctionStatistic struct {
-	Active     int `json:"active"`
-	Provisions int `json:"provisions"`
+	Active     uint16 `json:"active"`
+	Provisions uint64 `json:"provisions"`
 }
 
 type PipeStatistic struct {
-	Pushed   int
-	Pulled   int              `json:"processed"`
-	Dropped  int              `json:"dropped"`
-	Breaches int              `json:"breaches"`
+	Pushed   uint64
+	Pulled   uint64           `json:"processed"`
+	Dropped  uint64           `json:"dropped"`
+	Breaches uint64           `json:"breaches"`
 	Timing   TimingStatistics `json:"timing"`
 }
 
 type Statistics struct {
-	NumOfFunctions int                 `json:"num_of_functions"`
+	NumOfFunctions uint16              `json:"num_of_functions"`
 	Functions      []FunctionStatistic `json:"steps"`
-	NumOfChannels  int                 `json:"num_of_channels"`
+	NumOfChannels  uint16              `json:"num_of_channels"`
 	Pipes          []PipeStatistic     `json:"channels"`
 }
 

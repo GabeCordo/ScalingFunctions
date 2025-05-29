@@ -168,7 +168,7 @@ func (instance *pipelineRuntime) startup() error {
 	// data can begin flowing between functions in the pipeline.
 	for _, function := range instance.Pipeline.functions {
 
-		for j := 0; (j < function.Config.StartWith) && (j < function.Config.Maximum); j++ {
+		for j := uint16(0); (j < function.Config.StartWith) && (j < function.Config.Maximum); j++ {
 			instance.provision(function)
 
 			// note: these statistics are not run in parallel

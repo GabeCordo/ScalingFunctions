@@ -7,6 +7,7 @@
 package plover
 
 import (
+	"errors"
 	"reflect"
 	"sync"
 	"time"
@@ -54,8 +55,8 @@ func (status channelStatus) ToString() string {
 }
 
 type managedChannelConfig struct {
-	Threshold              int
-	UnderutilizedThreshold int
+	Threshold              uint32
+	UnderutilizedThreshold uint32
 	GrowthFactor           float64
 }
 
@@ -72,15 +73,15 @@ type managedChannel struct {
 	Name string
 
 	cStatus channelStatus
-	cSize   int
+	cSize   uint32
 
 	Config managedChannelConfig
 
 	Statistics             *TimingStatistics
 	LastPush               time.Time
-	UnderutilizedThreshold int
-	TotalProcessed         int
-	NumOfProducers         int
+	UnderutilizedThreshold uint32
+	TotalProcessed         uint32
+	NumOfProducers         uint32
 
 	channel chan channelDataWrapper
 
@@ -101,7 +102,22 @@ type managedChannel struct {
 //							Channel Functions
 ////////////////////////////////////////////////////////////////////////
 
-func newManagedChannel(name string, threshold int, growth float64, stats *TimingStatistics) *managedChannel {
+func newManagedChannel(name string, threshold uint32, growth float64, stats *TimingStatistics) (*managedChannel, error) {
+
+	// The TimingStatistics pointer must not be nil.
+	if stats == nil {
+		return nil, errors.New("newManagedChannel passed nil pointer for *TimingStatistics")
+	}
+
+	// The threshold value must be greater or equal to 1
+	if threshold < 1 {
+		return nil, errors.New("newManagedChannel received a threshold less than 1")
+	}
+
+	// The growth value must be greater than 1.0
+	if growth <= 1.0 {
+		return nil, errors.New("newManagedChannel received a growth less or equal to 1.0")
+	}
 
 	mc := new(managedChannel)
 
@@ -120,7 +136,7 @@ func newManagedChannel(name string, threshold int, growth float64, stats *Timing
 	mc.cFlags.stopNewPushes = false
 	mc.NumOfProducers = 0
 
-	return mc
+	return mc, nil
 }
 
 func (mc *managedChannel) Push(data []reflect.Value) bool {
@@ -211,17 +227,23 @@ func (mc *managedChannel) AddProducer() {
 	mc.NumOfProducers++
 }
 
-func (mc *managedChannel) ProducerDone() {
+func (mc *managedChannel) ProducerDone() error {
 
 	mc.cMutexes.producer.Lock()
 	defer mc.cMutexes.producer.Unlock()
 
-	mc.NumOfProducers--
+	// Terminate the function if the call is invalid.
+	if mc.NumOfProducers == 0 {
+		return errors.New("cannot call ProducerDone() when there are no producers")
+	}
 
+	mc.NumOfProducers--
 	if !mc.cFlags.channelFinished && (mc.NumOfProducers <= 0) {
 		mc.cFlags.channelFinished = true
 		close(mc.channel)
 	}
+
+	return nil
 }
 
 func (mc *managedChannel) GetState() channelStatus {

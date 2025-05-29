@@ -46,9 +46,15 @@ func TestBranchBuild(t *testing.T) {
 	b := NewBranch().Add(add).Add(mul).Add(prt)
 	b2 := NewBranch().Add(add2).Add(mul)
 
-	metadata := Build(b, b2)
+	pipeline := Build(b, b2)
 
-	fmt.Println(metadata)
+	if len(pipeline.functions) != 4 {
+		t.Error("expected the pipeline to have 4 functions.")
+	}
+
+	if len(pipeline.channels) != 2 {
+		t.Error("expected the pipeline to have 2 channels.")
+	}
 }
 
 func TestBuildFrom(t *testing.T) {
@@ -131,8 +137,3 @@ func stressLoad(in string) {
 	// assumption: uploading to database takes 3ms
 	time.Sleep(3 * time.Millisecond)
 }
-
-//func TestFunctionStress(t *testing.T) {
-//	Pipeline := Build(FunctionLink{Value: stressExtract}, FunctionLink{Value: stressTransform}, FunctionLink{Value: stressLoad})
-//	Pipeline.Run()
-//}

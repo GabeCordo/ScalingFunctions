@@ -18,7 +18,7 @@ var IsNotFunc = errors.New("passed value must be of type function")
 type Step struct {
 	id    string
 	value any
-	max   int
+	max   uint16
 }
 
 // Branch
@@ -37,7 +37,7 @@ type M struct {
 // is metadata tightly coupled with a function.
 type F struct {
 	Id    string
-	Max   int
+	Max   uint16
 	Value any
 }
 
@@ -63,7 +63,7 @@ func (b *Branch) Add(data any) *Branch {
 
 		s.id = v.String()
 		s.value = data
-		s.max = -1
+		s.max = ^uint16(0) // Fetch the max uint16 value.
 	}
 
 	if k != reflect.Func {

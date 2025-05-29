@@ -45,7 +45,7 @@ type pChannel struct {
 
 	Config struct {
 		GrowthFactor float64
-		Threshold    int
+		Threshold    uint32
 	} `json:"-"`
 
 	Mutex sync.RWMutex `json:"-"`
@@ -75,9 +75,9 @@ type pFunction struct {
 	} `json:"-"`
 
 	Config struct {
-		StartWith  int
+		StartWith  uint16
 		WaitBefore bool
-		Maximum    int
+		Maximum    uint16
 	} `json:"-"`
 
 	Mutex sync.RWMutex `json:"-"`
@@ -116,12 +116,16 @@ type Pipeline struct {
 func buildPChannel(config pChannelConfig) (*pChannel, error) {
 
 	newChan := new(pChannel)
+	var err error
 
 	newChan.Identifier = config.p.Identifier
 	newChan.Config.Threshold = config.p.Threshold
 	newChan.Config.GrowthFactor = config.p.GrowthFactor
 	newChan.Stats = config.s
-	newChan.Value = newManagedChannel(newChan.Identifier, config.p.Threshold, config.p.GrowthFactor, &config.s.Timing)
+	newChan.Value, err = newManagedChannel(newChan.Identifier, config.p.Threshold, config.p.GrowthFactor, &config.s.Timing)
+	if err != nil {
+		return nil, err
+	}
 	newChan.Receiver = make([]*pFunction, 0)
 	newChan.Producers = make([]*pFunction, 0)
 
