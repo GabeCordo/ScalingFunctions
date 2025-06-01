@@ -209,8 +209,10 @@ func (instance *pipelineRuntime) runtime() {
 				for _, f := range chn.Receiver {
 					n := chn.Config.GrowthFactor
 					for (n > 0) && (f.Stats.Active < f.Config.Maximum) {
+						f.Mutex.Lock()
 						f.Stats.Provisions++
 						f.Stats.Active++
+						f.Mutex.Unlock()
 						instance.provision(f)
 						n--
 					}
@@ -221,11 +223,14 @@ func (instance *pipelineRuntime) runtime() {
 
 					n := chn.Config.GrowthFactor
 					for n > 0 {
+						f.Mutex.RLock()
 						// never remove all transform nodes otherwise we risk the
 						// ET channel having no consumers
 						if f.Stats.Active <= 1 {
+							f.Mutex.RUnlock()
 							break
 						}
+						f.Mutex.RUnlock()
 						f.Stats.Active--
 						instance.remove(f)
 						n--
@@ -416,9 +421,11 @@ func (instance *pipelineRuntime) extractShutdownWrapper() <-chan struct{} {
 		for {
 			// the IsAlive clause ensures that once a runner is dead, we will not leak memory
 			// with a forever-running goroutine
+			instance.mutex.global.RLock()
 			if (instance.Status == Stopping) || (!instance.IsAlive()) {
 				break
 			}
+			instance.mutex.global.RUnlock()
 			time.Sleep(1 * time.Second)
 		}
 	}()
@@ -817,9 +824,11 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 // terminates a running instance of type pFunction.
 func (instance *pipelineRuntime) remove(function *pFunction) {
 
+	function.Mutex.RLock()
 	if function.Stats.Active <= 0 {
 		panic("attempting to quit when no functions are running")
 	}
+	defer function.Mutex.RUnlock()
 
 	quit := function.Quit[0]
 	function.Quit = function.Quit[1:]
@@ -867,7 +876,9 @@ func (instance *pipelineRuntime) close() {
 	instance.waitGroup.startup.Wait()
 
 	for _, f := range instance.Pipeline.roots {
+		f.Mutex.Lock()
 		f.Stats.Active--
+		f.Mutex.Unlock()
 		f.To.Value.ProducerDone()
 	}
 }

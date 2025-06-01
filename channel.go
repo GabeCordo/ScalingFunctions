@@ -151,7 +151,9 @@ func (mc *managedChannel) Push(data []reflect.Value) bool {
 	// see if we are hitting a threshold and the successive function is
 	// getting overloaded with data units
 	if (mc.cSize + 1) >= mc.Config.Threshold {
+		mc.cMutexes.producer.Lock()
 		mc.cStatus = Congested
+		mc.cMutexes.producer.Unlock()
 	}
 
 	mc.cSize++
@@ -209,7 +211,7 @@ func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) {
 	}
 
 	mc.cSize--
-	mc.cStatus = mc.GetState()
+	mc.GetState()
 }
 
 func (mc *managedChannel) Accepting() bool {
@@ -248,8 +250,8 @@ func (mc *managedChannel) ProducerDone() error {
 
 func (mc *managedChannel) GetState() channelStatus {
 
-	mc.cMutexes.producer.RLock()
-	defer mc.cMutexes.producer.RUnlock()
+	mc.cMutexes.producer.Lock()
+	defer mc.cMutexes.producer.Unlock()
 
 	if mc.cFlags.channelFinished {
 		mc.cStatus = Closed
