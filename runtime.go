@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GabeCordo/Plover/internal"
+	"github.com/GabeCordo/plover/internal"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -26,15 +26,21 @@ const (
 )
 
 ////////////////////////////////////////////////////////////////////////////////
+////								Errors									////
+////////////////////////////////////////////////////////////////////////////////
+
+var FunctionHasZeroStartWith = errors.New("pFunction cannot have a StartWith config of zero")
+
+////////////////////////////////////////////////////////////////////////////////
 ////								Types									////
 ////////////////////////////////////////////////////////////////////////////////
 
-// runStatus
+// RunStatus
 // represents the current cStatus of the pipeline.
-type runStatus string
+type RunStatus string
 
 const (
-	UnTouched    runStatus = "untouched"
+	UnTouched    RunStatus = "untouched"
 	Starting               = "starting"
 	Active                 = "active"
 	Provisioning           = "provisioning"
@@ -44,7 +50,7 @@ const (
 	Unknown                = "-"
 )
 
-func (status runStatus) ToString() string {
+func (status RunStatus) ToString() string {
 	switch status {
 	case UnTouched:
 		return "UnTouched"
@@ -96,7 +102,7 @@ const (
 // is a container that holds all values used by a running instance of a Pipeline.
 type pipelineRuntime struct {
 	Id     uint64    `json:"id"`     // a unique identifier for the pipeline instance.
-	Status runStatus `json:"status"` // the cStatus of the pipeline
+	Status RunStatus `json:"status"` // the cStatus of the pipeline
 
 	Pipeline Pipeline // each pipeline has zero to many pipelineRuntime instances
 
@@ -167,6 +173,23 @@ func (instance *pipelineRuntime) startup() error {
 	// provision each function in the pipeline that is required before
 	// data can begin flowing between functions in the pipeline.
 	for _, function := range instance.Pipeline.functions {
+
+		// If there exists a pFunction.Config.StartWith config that is 0,
+		// it is possible for the pipeline to deadlock. One of the functions
+		// in the pipeline will not be created breaking the chain of execution.
+		//
+		// (Example)
+		// Function:		A	->	B	->	C	-> 	D
+		// StartWith:		1		0		1		1
+		//
+		// pFunction 'B' has a StartWith 0 so the startup() function will not
+		// start any listener for the 1st channel, or producer for the 2nd channel.
+		//
+		// pFunction 'A' will be pushing to a channel that isn't read.
+		// pFunction 'C' and 'D' will be not receive data wasting resources.
+		if function.Config.StartWith == 0 {
+			return FunctionHasZeroStartWith
+		}
 
 		for j := uint16(0); (j < function.Config.StartWith) && (j < function.Config.Maximum); j++ {
 			instance.provision(function)
@@ -292,8 +315,6 @@ func (instance *pipelineRuntime) start() error {
 	//// end creating the default frontend goroutines
 
 	instance.runtime()
-
-	//instance.waitGroup.Wait() // wait for the Extract-Transform-Load (ETL) Cycle to Complete
 
 	instance.teardown()
 

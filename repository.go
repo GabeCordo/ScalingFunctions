@@ -42,6 +42,24 @@ func (module *Module) Map(mappings map[string]any) error {
 	return nil
 }
 
+func (module *Module) GetIR() *ModuleIR {
+
+	ir := new(ModuleIR)
+	ir.Identifier = module.Name
+	ir.Version = module.Version
+
+	numOfFunctions := len(module.functions)
+	ir.Functions = make([]FunctionIR, numOfFunctions)
+
+	idx := 0
+	for _, function := range module.functions {
+		ir.Functions[idx] = function.GetIR()
+		idx++
+	}
+
+	return ir
+}
+
 type Repository struct {
 	modules map[string]*Module
 	mutex   sync.RWMutex
@@ -66,10 +84,26 @@ func (r *Repository) Module(name string) *Module {
 
 		mod := new(Module)
 		mod.Name = name
+		mod.Version = "v0.0.1"
 		mod.functions = make(map[string]F)
 
 		r.modules[name] = mod
 	}
 
 	return r.modules[name]
+}
+
+// GetModules
+// Find the modules registered to the Repository.
+func (r *Repository) GetModules() (modules []*Module) {
+
+	modules = make([]*Module, len(r.modules))
+
+	idx := 0
+	for _, m := range r.modules {
+		modules[idx] = m
+		idx++
+	}
+
+	return modules
 }

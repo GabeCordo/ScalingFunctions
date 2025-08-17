@@ -11,6 +11,10 @@ import (
 	"reflect"
 )
 
+// defaultStaticMount
+// is the default metadata mount type for a function.
+const defaultStaticMount = true
+
 var IsNotFunc = errors.New("passed value must be of type function")
 
 // Step
@@ -39,6 +43,29 @@ type F struct {
 	Id    string
 	Max   uint16
 	Value any
+}
+
+func (f F) GetIR() FunctionIR {
+
+	ir := FunctionIR{}
+	ir.Identifier = f.Id
+	ir.Metadata.StaticMount = defaultStaticMount
+
+	reflected := reflect.TypeOf(f.Value)
+
+	numOfParameters := reflected.NumIn()
+	ir.Parameters = make([]string, numOfParameters)
+	for i := 0; i < numOfParameters; i++ {
+		ir.Parameters[i] = reflected.In(i).String()
+	}
+
+	numOfReturns := reflected.NumOut()
+	ir.Returns = make([]string, numOfReturns)
+	for i := 0; i < numOfReturns; i++ {
+		ir.Returns[i] = reflected.Out(i).String()
+	}
+
+	return ir
 }
 
 // Add
