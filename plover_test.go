@@ -7,11 +7,19 @@
 package plover
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"github.com/GabeCordo/plover/internal"
+	"log"
+	"strconv"
+	"strings"
 	"testing"
-	"time"
 )
+
+////////////////////////////////////////////////////////////////////////
+//					Pipeline Functions to Run
+////////////////////////////////////////////////////////////////////////
 
 func gen(out chan int) {
 
@@ -38,8 +46,46 @@ func mul(c int) (d int) {
 }
 
 func prt(d int) {
-	fmt.Println(d)
+	log.Println(d)
 }
+
+////////////////////////////////////////////////////////////////////////
+//						Test Helper Functions
+////////////////////////////////////////////////////////////////////////
+
+func setupLogOutput() (buf *bytes.Buffer) {
+
+	buf = new(bytes.Buffer)
+	log.SetOutput(buf)
+	log.SetFlags(0) // do not show timestamp
+
+	return buf
+}
+
+func validateGenMulPrt(buf *bytes.Buffer) (err []error) {
+
+	err = make([]error, 0)
+
+	stdOut := buf.String()
+	linesInStdOut := strings.Split(stdOut, "\n")
+	linesInStdOut = linesInStdOut[:len(linesInStdOut)-1] // there will be one extra index we want to remove.
+
+	for idx, line := range linesInStdOut {
+		expectedValue := idx * 2                    // output of 'gen' + 'mul'
+		expectedLine := strconv.Itoa(expectedValue) // output of 'prt'
+
+		if line != expectedLine {
+			output := fmt.Sprintf("at index %d, expected: %d, received: %s", idx, idx*2, line)
+			err = append(err, errors.New(output))
+		}
+	}
+
+	return err
+}
+
+////////////////////////////////////////////////////////////////////////
+//								Tests
+////////////////////////////////////////////////////////////////////////
 
 func TestBranchBuild(t *testing.T) {
 
@@ -57,7 +103,12 @@ func TestBranchBuild(t *testing.T) {
 	}
 }
 
-func TestBuildFrom(t *testing.T) {
+func TestBuildFrom_Map(t *testing.T) {
+
+	var buf *bytes.Buffer
+	if internal.GO_RACE_CHECKER_DISABLED {
+		buf = setupLogOutput()
+	}
 
 	d := PipelineIR{
 		Functions: []FunctionIR{
@@ -72,68 +123,154 @@ func TestBuildFrom(t *testing.T) {
 	}
 
 	r := NewRepository()
-	r.Module("common").Map(map[string]any{
+	err := r.Module("common").Map(map[string]any{
 		"gen": gen,
 		"mul": mul,
 		"prt": prt,
 	})
+	if err != nil {
+		t.Error(err)
+	}
 
-	Build(&d, r).Run()
+	err = Build(&d, r).Run()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if internal.GO_RACE_CHECKER_DISABLED {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
+	}
+}
+
+func TestBuildFrom_LinkFunction(t *testing.T) {
+
+	var buf *bytes.Buffer
+	if internal.GO_RACE_CHECKER_DISABLED {
+		buf = setupLogOutput()
+	}
+
+	d := PipelineIR{
+		Functions: []FunctionIR{
+			FunctionIR{Module: "common", Identifier: "gen", To: "0", StartWith: 1, Maximum: 1},
+			FunctionIR{Module: "common", Identifier: "mul", From: "0", To: "1", StartWith: 1, Maximum: 1},
+			FunctionIR{Module: "common", Identifier: "prt", From: "1", StartWith: 1, Maximum: 1},
+		},
+		Pipes: []PipeIR{
+			PipeIR{Identifier: "0", Threshold: 1, GrowthFactor: 2.0},
+			PipeIR{Identifier: "1", Threshold: 1, GrowthFactor: 2.0},
+		},
+	}
+
+	r := NewRepository()
+	m := r.Module("common")
+
+	err := m.LinkFunction("gen", gen)
+	if err != nil {
+		t.Error(err)
+	}
+	err = m.LinkFunction("mul", mul)
+	if err != nil {
+		t.Error(err)
+	}
+	err = m.LinkFunction("prt", prt)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = Build(&d, r).Run()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if internal.GO_RACE_CHECKER_DISABLED {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
+	}
 }
 
 func TestBranchRun(t *testing.T) {
 
+	var buf *bytes.Buffer
+	if internal.GO_RACE_CHECKER_DISABLED {
+		buf = setupLogOutput()
+	}
+
 	b := NewBranch().Add(gen).Add(mul).Add(prt)
-	Build(b).Run()
+	err := Build(b).Run()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if internal.GO_RACE_CHECKER_DISABLED {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
+	}
 }
 
 func TestBranchWrapperRun(t *testing.T) {
 
+	var buf *bytes.Buffer
+	if internal.GO_RACE_CHECKER_DISABLED {
+		buf = setupLogOutput()
+	}
+
 	b := NewBranch().Add(F{Id: "extract", Value: gen}).Add(F{Id: "transform", Value: mul}).Add(F{Id: "load", Value: prt})
-	Build(b).Run()
+	err := Build(b).Run()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if internal.GO_RACE_CHECKER_DISABLED {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
+	}
 }
 
 func TestFunctionRun(t *testing.T) {
 
-	Build(gen, mul, prt).Run()
+	var buf *bytes.Buffer
+	if internal.GO_RACE_CHECKER_DISABLED {
+		buf = setupLogOutput()
+	}
+
+	err := Build(gen, mul, prt).Run()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if internal.GO_RACE_CHECKER_DISABLED {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
+	}
 }
 
 func TestFunctionWrapperRun(t *testing.T) {
 
-	Build(F{Id: "extract", Value: gen}, F{Id: "transform", Value: mul}, F{Id: "load", Value: prt}).Run()
-}
-
-func stressExtract(out chan string) {
-
-	// assumption: data is pulled from database and pushed to transform in another action
-	for i := 0; i < 1000000; i++ {
-		out <- "foo"
+	var buf *bytes.Buffer
+	if internal.GO_RACE_CHECKER_DISABLED {
+		buf = setupLogOutput()
 	}
 
-	time.Sleep(20 * time.Second)
-
-	for i := 0; i < 500000; i++ {
-		out <- "bar"
+	err := Build(F{Id: "extract", Value: gen}, F{Id: "transform", Value: mul}, F{Id: "load", Value: prt}).Run()
+	if err != nil {
+		t.Error(err)
 	}
 
-	close(out)
-}
-
-func stressTransform(in string) (out string, err error) {
-
-	// "foo" and "bar" are the only valid types
-	if (in != "foo") && (in != "bar") {
-		return "", errors.New("'in' must be of value ('foo' or 'bar')")
+	if internal.GO_RACE_CHECKER_DISABLED {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
 	}
-
-	// assumption: processing some unit of data takes 4ms
-	time.Sleep(4 * time.Millisecond)
-
-	return in, nil
-}
-
-func stressLoad(in string) {
-
-	// assumption: uploading to database takes 3ms
-	time.Sleep(3 * time.Millisecond)
 }

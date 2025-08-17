@@ -23,6 +23,8 @@ import (
 //
 ////////////////////////////////////////////////////////////////////////
 
+const pDefaultId uint64 = 0
+
 type pInjectible struct {
 	value reflect.Value
 }
@@ -235,6 +237,19 @@ func buildPipeline(iR *PipelineIR) (Pipeline, error) {
 //		∟ .TestAs( channel_name, data, ... )
 //
 ////////////////////////////////////////////////////////////////////////
+
+func (pipeline Pipeline) Interactable() Interactable {
+
+	runtime := newPipelineRuntime(pipeline)
+	interactable := Interactable{
+		Id:       pDefaultId,
+		Pipeline: pipeline.identifier,
+		pipeline: pipeline,
+		runtime:  runtime,
+	}
+
+	return interactable
+}
 
 func (pipeline Pipeline) Run(injectables ...any) error {
 
