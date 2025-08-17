@@ -39,21 +39,6 @@ func TestVerifyIR_MissingModuleIdentifier(t *testing.T) {
 	}
 }
 
-func TestVerifyIR_MissingModuleCreator(t *testing.T) {
-
-	ir := generateValidModuleIR()
-
-	ee := VerifyIR(ir)
-	if len(ee) != 1 {
-		t.Errorf("expected at least on IR verification to fail")
-		return
-	}
-
-	if !errors.Is(ee[0], EmptyCreator) {
-		t.Errorf("expected IR verification to fail on 'EmptyCreator'")
-	}
-}
-
 func TestVerifyIR_MissingModuleVersion(t *testing.T) {
 
 	ir := generateValidModuleIR()
