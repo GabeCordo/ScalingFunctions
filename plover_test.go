@@ -106,7 +106,7 @@ func TestBranchBuild(t *testing.T) {
 func TestBuildFrom_Map(t *testing.T) {
 
 	var buf *bytes.Buffer
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		buf = setupLogOutput()
 	}
 
@@ -137,7 +137,7 @@ func TestBuildFrom_Map(t *testing.T) {
 		t.Error(err)
 	}
 
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		ee := validateGenMulPrt(buf)
 		for _, e := range ee {
 			t.Error(e)
@@ -148,7 +148,7 @@ func TestBuildFrom_Map(t *testing.T) {
 func TestBuildFrom_LinkFunction(t *testing.T) {
 
 	var buf *bytes.Buffer
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		buf = setupLogOutput()
 	}
 
@@ -185,7 +185,7 @@ func TestBuildFrom_LinkFunction(t *testing.T) {
 		t.Error(err)
 	}
 
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		ee := validateGenMulPrt(buf)
 		for _, e := range ee {
 			t.Error(e)
@@ -196,7 +196,7 @@ func TestBuildFrom_LinkFunction(t *testing.T) {
 func TestBranchRun(t *testing.T) {
 
 	var buf *bytes.Buffer
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		buf = setupLogOutput()
 	}
 
@@ -206,7 +206,7 @@ func TestBranchRun(t *testing.T) {
 		t.Error(err)
 	}
 
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		ee := validateGenMulPrt(buf)
 		for _, e := range ee {
 			t.Error(e)
@@ -217,7 +217,7 @@ func TestBranchRun(t *testing.T) {
 func TestBranchWrapperRun(t *testing.T) {
 
 	var buf *bytes.Buffer
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		buf = setupLogOutput()
 	}
 
@@ -227,7 +227,7 @@ func TestBranchWrapperRun(t *testing.T) {
 		t.Error(err)
 	}
 
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		ee := validateGenMulPrt(buf)
 		for _, e := range ee {
 			t.Error(e)
@@ -238,7 +238,7 @@ func TestBranchWrapperRun(t *testing.T) {
 func TestFunctionRun(t *testing.T) {
 
 	var buf *bytes.Buffer
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		buf = setupLogOutput()
 	}
 
@@ -247,7 +247,7 @@ func TestFunctionRun(t *testing.T) {
 		t.Error(err)
 	}
 
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		ee := validateGenMulPrt(buf)
 		for _, e := range ee {
 			t.Error(e)
@@ -258,7 +258,7 @@ func TestFunctionRun(t *testing.T) {
 func TestFunctionWrapperRun(t *testing.T) {
 
 	var buf *bytes.Buffer
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		buf = setupLogOutput()
 	}
 
@@ -267,7 +267,7 @@ func TestFunctionWrapperRun(t *testing.T) {
 		t.Error(err)
 	}
 
-	if internal.DEBUG {
+	if internal.GO_RACE_CHECKER_DISABLED {
 		ee := validateGenMulPrt(buf)
 		for _, e := range ee {
 			t.Error(e)
