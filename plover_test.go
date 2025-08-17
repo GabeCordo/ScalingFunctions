@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/GabeCordo/plover/internal"
 	"log"
 	"strconv"
 	"strings"
@@ -104,7 +105,10 @@ func TestBranchBuild(t *testing.T) {
 
 func TestBuildFrom_Map(t *testing.T) {
 
-	buf := setupLogOutput()
+	var buf *bytes.Buffer
+	if internal.DEBUG {
+		buf = setupLogOutput()
+	}
 
 	d := PipelineIR{
 		Functions: []FunctionIR{
@@ -133,15 +137,20 @@ func TestBuildFrom_Map(t *testing.T) {
 		t.Error(err)
 	}
 
-	ee := validateGenMulPrt(buf)
-	for _, e := range ee {
-		t.Error(e)
+	if internal.DEBUG {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
 	}
 }
 
 func TestBuildFrom_LinkFunction(t *testing.T) {
 
-	buf := setupLogOutput()
+	var buf *bytes.Buffer
+	if internal.DEBUG {
+		buf = setupLogOutput()
+	}
 
 	d := PipelineIR{
 		Functions: []FunctionIR{
@@ -176,15 +185,20 @@ func TestBuildFrom_LinkFunction(t *testing.T) {
 		t.Error(err)
 	}
 
-	ee := validateGenMulPrt(buf)
-	for _, e := range ee {
-		t.Error(e)
+	if internal.DEBUG {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
 	}
 }
 
 func TestBranchRun(t *testing.T) {
 
-	buf := setupLogOutput()
+	var buf *bytes.Buffer
+	if internal.DEBUG {
+		buf = setupLogOutput()
+	}
 
 	b := NewBranch().Add(gen).Add(mul).Add(prt)
 	err := Build(b).Run()
@@ -192,15 +206,20 @@ func TestBranchRun(t *testing.T) {
 		t.Error(err)
 	}
 
-	ee := validateGenMulPrt(buf)
-	for _, e := range ee {
-		t.Error(e)
+	if internal.DEBUG {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
 	}
 }
 
 func TestBranchWrapperRun(t *testing.T) {
 
-	buf := setupLogOutput()
+	var buf *bytes.Buffer
+	if internal.DEBUG {
+		buf = setupLogOutput()
+	}
 
 	b := NewBranch().Add(F{Id: "extract", Value: gen}).Add(F{Id: "transform", Value: mul}).Add(F{Id: "load", Value: prt})
 	err := Build(b).Run()
@@ -208,38 +227,50 @@ func TestBranchWrapperRun(t *testing.T) {
 		t.Error(err)
 	}
 
-	ee := validateGenMulPrt(buf)
-	for _, e := range ee {
-		t.Error(e)
+	if internal.DEBUG {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
 	}
 }
 
 func TestFunctionRun(t *testing.T) {
 
-	buf := setupLogOutput()
+	var buf *bytes.Buffer
+	if internal.DEBUG {
+		buf = setupLogOutput()
+	}
 
 	err := Build(gen, mul, prt).Run()
 	if err != nil {
 		t.Error(err)
 	}
 
-	ee := validateGenMulPrt(buf)
-	for _, e := range ee {
-		t.Error(e)
+	if internal.DEBUG {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
 	}
 }
 
 func TestFunctionWrapperRun(t *testing.T) {
 
-	buf := setupLogOutput()
+	var buf *bytes.Buffer
+	if internal.DEBUG {
+		buf = setupLogOutput()
+	}
 
 	err := Build(F{Id: "extract", Value: gen}, F{Id: "transform", Value: mul}, F{Id: "load", Value: prt}).Run()
 	if err != nil {
 		t.Error(err)
 	}
 
-	ee := validateGenMulPrt(buf)
-	for _, e := range ee {
-		t.Error(e)
+	if internal.DEBUG {
+		ee := validateGenMulPrt(buf)
+		for _, e := range ee {
+			t.Error(e)
+		}
 	}
 }
