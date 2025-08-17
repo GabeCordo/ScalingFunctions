@@ -7,6 +7,7 @@
 package plover
 
 import (
+	"errors"
 	"reflect"
 	"sync"
 )
@@ -22,6 +23,8 @@ import (
 //			∟ pFunctionConfig : used to build a pFunction
 //
 ////////////////////////////////////////////////////////////////////////
+
+var NonOwningPipeline = errors.New("function calls on a pipeline are not allowed after an interactable is created")
 
 const pDefaultId uint64 = 0
 
@@ -101,6 +104,10 @@ type Pipeline struct {
 
 	injected      []*pInjectible
 	numOfInjected int
+
+	flags struct {
+		interactableCreated bool
+	}
 
 	Stats *Statistics
 }
@@ -224,6 +231,8 @@ func buildPipeline(iR *PipelineIR) (Pipeline, error) {
 		graph.functions[i] = function
 	}
 
+	graph.flags.interactableCreated = false
+
 	return graph, nil
 }
 
@@ -248,10 +257,15 @@ func (pipeline Pipeline) Interactable() Interactable {
 		runtime:  runtime,
 	}
 
+	pipeline.flags.interactableCreated = true
 	return interactable
 }
 
 func (pipeline Pipeline) Run(injectables ...any) error {
+
+	if pipeline.flags.interactableCreated {
+		return NonOwningPipeline
+	}
 
 	runtime := newPipelineRuntime(pipeline)
 	runtime.injectDependencies(injectables...)
@@ -266,6 +280,13 @@ type TestReport struct {
 }
 
 func (pipeline Pipeline) Test(data any, injectables ...any) TestReport {
+
+	if pipeline.flags.interactableCreated {
+		return TestReport{
+			Success: false,
+			Cause:   NonOwningPipeline,
+		}
+	}
 
 	runtime := newPipelineRuntime(pipeline)
 	runtime.injectDependencies(injectables...)
@@ -290,6 +311,13 @@ func (pipeline Pipeline) Test(data any, injectables ...any) TestReport {
 }
 
 func (pipeline Pipeline) TestAs(f string, data any, injectables ...any) TestReport {
+
+	if pipeline.flags.interactableCreated {
+		return TestReport{
+			Success: false,
+			Cause:   NonOwningPipeline,
+		}
+	}
 
 	runtime := newPipelineRuntime(pipeline)
 	runtime.injectDependencies(injectables...)

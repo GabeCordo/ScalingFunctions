@@ -215,10 +215,18 @@ func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) {
 }
 
 func (mc *managedChannel) Accepting() bool {
+
+	mc.cMutexes.size.Lock()
+	defer mc.cMutexes.size.Unlock()
+
 	return !mc.cFlags.stopNewPushes
 }
 
 func (mc *managedChannel) StopPushes() {
+
+	mc.cMutexes.size.Lock()
+	defer mc.cMutexes.size.Unlock()
+
 	mc.cFlags.stopNewPushes = true
 }
 
@@ -242,6 +250,7 @@ func (mc *managedChannel) ProducerDone() error {
 	mc.NumOfProducers--
 	if !mc.cFlags.channelFinished && (mc.NumOfProducers <= 0) {
 		mc.cFlags.channelFinished = true
+		mc.cFlags.stopNewPushes = true
 		close(mc.channel)
 	}
 

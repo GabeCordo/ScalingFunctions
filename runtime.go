@@ -308,6 +308,7 @@ func (instance *pipelineRuntime) start() error {
 
 	err = instance.startup()
 	if err != nil {
+		instance.waitGroup.startup.Done()
 		return err
 	}
 	instance.waitGroup.startup.Done() // allow actions that need to wait for startup to begin
@@ -900,6 +901,7 @@ func (instance *pipelineRuntime) close() {
 		f.Mutex.Lock()
 		f.Stats.Active--
 		f.Mutex.Unlock()
+		f.To.Value.StopPushes()
 		f.To.Value.ProducerDone()
 	}
 }
