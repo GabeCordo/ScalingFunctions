@@ -91,8 +91,9 @@ type managedChannel struct {
 	}
 
 	cMutexes struct {
-		producer sync.RWMutex
-		size     sync.Mutex
+		state    sync.RWMutex // guards writing and closing the channel
+		producer sync.RWMutex // guards 'NumOfProducers' and 'cStatus'
+		size     sync.Mutex   // guards 'cSize', 'TotalProcessed', and statistics.
 	}
 
 	wg sync.WaitGroup
@@ -143,11 +144,6 @@ func (mc *managedChannel) Push(data []reflect.Value) bool {
 
 	mc.cMutexes.size.Lock()
 
-	// don't push to the channel if it is supposed to be closed
-	if mc.cFlags.stopNewPushes {
-		return false
-	}
-
 	// see if we are hitting a threshold and the successive function is
 	// getting overloaded with data units
 	if (mc.cSize + 1) >= mc.Config.Threshold {
@@ -183,7 +179,13 @@ func (mc *managedChannel) Push(data []reflect.Value) bool {
 		return false
 	}
 
+	// don't push to the channel if it is supposed to be closed
+	mc.cMutexes.state.Lock()
+	if mc.cFlags.stopNewPushes {
+		return false
+	}
 	mc.channel <- channelDataWrapper{In: currentTime, Data: data}
+	mc.cMutexes.state.Unlock()
 
 	return true
 }
@@ -243,15 +245,17 @@ func (mc *managedChannel) ProducerDone() error {
 	defer mc.cMutexes.producer.Unlock()
 
 	// Terminate the function if the call is invalid.
-	if mc.NumOfProducers == 0 {
+	if mc.NumOfProducers <= 0 {
 		return errors.New("cannot call ProducerDone() when there are no producers")
 	}
 
 	mc.NumOfProducers--
 	if !mc.cFlags.channelFinished && (mc.NumOfProducers <= 0) {
+		mc.cMutexes.state.Lock()
 		mc.cFlags.channelFinished = true
 		mc.cFlags.stopNewPushes = true
 		close(mc.channel)
+		mc.cMutexes.state.Unlock()
 	}
 
 	return nil

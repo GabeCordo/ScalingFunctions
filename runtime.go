@@ -897,12 +897,16 @@ func (instance *pipelineRuntime) close() {
 
 	instance.waitGroup.startup.Wait()
 
+	var err error
 	for _, f := range instance.Pipeline.roots {
 		f.Mutex.Lock()
 		f.Stats.Active--
 		f.Mutex.Unlock()
-		f.To.Value.StopPushes()
-		f.To.Value.ProducerDone()
+
+		err = f.To.Value.ProducerDone()
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 }
 
