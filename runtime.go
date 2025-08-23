@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GabeCordo/plover/internal"
+	"github.com/FortifiedCode/plover/internal"
 )
 
 ////////////////////////////////////////////////////////////////////////////////

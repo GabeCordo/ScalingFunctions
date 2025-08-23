@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/GabeCordo/plover/internal"
+	"github.com/FortifiedCode/plover/internal"
 	"log"
 	"strconv"
 	"strings"
