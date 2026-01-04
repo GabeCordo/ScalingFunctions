@@ -204,7 +204,7 @@ func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) {
 		} else if totalTimeInQueue < mc.Statistics.MinTimeBeforePop {
 			mc.Statistics.MinTimeBeforePop = totalTimeInQueue
 		}
-		mc.Statistics.AverageTime += totalTimeInQueue / 2
+		mc.Statistics.AverageTime = (mc.Statistics.AverageTime + totalTimeInQueue) / 2
 	} else {
 		mc.Statistics.AverageTime = totalTimeInQueue
 		mc.Statistics.MedianTime = 0 // TODO: support

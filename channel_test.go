@@ -1,6 +1,11 @@
 package plover
 
-import "testing"
+import (
+	"fmt"
+	"reflect"
+	"testing"
+	"time"
+)
 
 func TestManagedChannel_NewManagedChannel_NilStats(t *testing.T) {
 
@@ -86,4 +91,37 @@ func TestManagedChannel_ProducerDone_Invalid(t *testing.T) {
 	if mc.NumOfProducers != 0 {
 		t.Error("expected ProducerDone() to ignore the invalid call.")
 	}
+}
+
+func TestManagedChannel_DataStatistic(t *testing.T) {
+
+	s := TimingStatistics{}
+	mc, err := newManagedChannel("foo", 1, 2.0, &s)
+	if err != nil {
+		t.Skip()
+	}
+
+	v := reflect.ValueOf(1)
+	vv := []reflect.Value{v}
+
+	mc.AddProducer()
+
+	for i := 0; i < 10; i++ {
+		mc.Push(vv)
+		time.Sleep(1 * time.Millisecond)
+	}
+	err = mc.ProducerDone()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	for data := range mc.channel {
+		mc.DataPopped(data.In)
+	}
+
+	fmt.Println(mc.Statistics.AverageTime)
+	fmt.Println(mc.Statistics.MaxTimeBeforePop)
+	fmt.Println(mc.Statistics.MinTimeBeforePop)
+	fmt.Println(mc.Statistics.MedianTime)
 }
