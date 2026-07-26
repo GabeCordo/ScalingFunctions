@@ -1,10 +1,10 @@
-// Package plover
+// Package ScalingFunctions
 //
-// Copyright (c) 2024-2025. Gabriel Cordovado
+// Copyright (c) 2024-2026. Gabriel Cordovado
 // All rights reserved.
 //
 // Source file:  runtime.go
-package plover
+package ScalingFunctions
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FortifiedCode/plover/internal"
+	"github.com/GabeCordo/ScalingFunctions/internal"
 )
 
 ////////////////////////////////////////////////////////////////////////////////

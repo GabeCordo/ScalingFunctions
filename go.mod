@@ -1,3 +1,3 @@
-module github.com/FortifiedCode/plover
+module github.com/GabeCordo/ScalingFunctions
 
-go 1.24
+go 1.25

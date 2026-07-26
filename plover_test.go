@@ -1,20 +1,21 @@
-// Package plover
+// Package ScalingFunctions
 //
-// Copyright (c) 2024-2025. Gabriel Cordovado
+// Copyright (c) 2024-2026. Gabriel Cordovado
 // All rights reserved.
 //
 // Source file:  plover_test.go
-package plover
+package ScalingFunctions
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/FortifiedCode/plover/internal"
 	"log"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/GabeCordo/ScalingFunctions/internal"
 )
 
 ////////////////////////////////////////////////////////////////////////

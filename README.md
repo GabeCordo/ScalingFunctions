@@ -1,4 +1,4 @@
-# plover Framework
+# ScalingFunctions Framework
 
 An open source framework for building multithreaded data pipelines. 
 

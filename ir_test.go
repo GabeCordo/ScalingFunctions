@@ -1,4 +1,10 @@
-package plover
+// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  ir_test.go
+package ScalingFunctions
 
 import (
 	"errors"
