@@ -1,6 +1,6 @@
 # Getting Started in 5 Minutes
 
-plover is a powerful framework that allows you to build multithreaded pipelines in a couple lines of code. The pipelines
+ScalingFunctions is a powerful framework that allows you to build multithreaded pipelines in a couple lines of code. The pipelines
 can be as simple as an [ETL]() set of functions or a series of sequential functions processing data.
 
 Our first example is a three function pipelines; a generator function that creates data, a transform function that 
@@ -19,7 +19,7 @@ go mod init
 Install the framework so that we can get to work right away.
 
 ```shell
-go install git@github.com:GabeCordo/plover.git
+go install git@github.com:GabeCordo/ScalingFunctions.git
 ```
 
 ## Writting Our Functions

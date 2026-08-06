@@ -182,7 +182,7 @@ func buildPipeline(iR *PipelineIR) (Pipeline, error) {
 	graph.identifier = iR.Identifier
 
 	// todo : this mem allocation should not be here
-	graph.Stats = NewStatistics(len(iR.Functions), len(iR.Pipes))
+	graph.Stats = NewStatistics(uint16(len(iR.Functions)), uint16(len(iR.Pipes)))
 
 	graph.channels = make([]*pChannel, len(iR.Pipes))
 	for i, c := range iR.Pipes {

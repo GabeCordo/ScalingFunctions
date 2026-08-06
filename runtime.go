@@ -13,8 +13,6 @@ import (
 	"reflect"
 	"sync"
 	"time"
-
-	"github.com/GabeCordo/ScalingFunctions/internal"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -494,7 +492,7 @@ func (instance *pipelineRuntime) call(function *pFunction, ins []reflect.Value) 
 			isNil := lastResult.IsNil()
 
 			if !isNil {
-				// the plover framework shall be responsible for displaying errors sent
+				// the framework shall be responsible for displaying errors sent
 				// by the Pipeline to avoid requiring the developer to handle and return
 				// the error which is considered an anti-pattern
 				log.Println(lastResult.Elem())

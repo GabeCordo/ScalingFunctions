@@ -2,6 +2,6 @@
 //go:build !debug
 // +build !debug
 
-package internal
+package flags
 
 const DEBUG = false

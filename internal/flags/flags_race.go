@@ -2,6 +2,6 @@
 //go:build race
 // +build race
 
-package internal
+package flags
 
 const GO_RACE_CHECKER_DISABLED = false

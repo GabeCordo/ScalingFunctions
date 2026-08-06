@@ -1,6 +1,6 @@
 # Requirements
 
-This markdown file acts as a reference for the requirements of the plover Framework.
+This markdown file acts as a reference for the requirements of the ScalingFunctions Framework.
 
 ## Functional Requirements
 

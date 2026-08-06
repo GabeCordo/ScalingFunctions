@@ -57,7 +57,7 @@ func (s Statistics) Print() {
 
 // NewStatistics
 // is a constructor function to initialize memory for storing statistics.
-func NewStatistics(numOfFunctions, numOfPipes int) *Statistics {
+func NewStatistics(numOfFunctions, numOfPipes uint16) *Statistics {
 	stats := new(Statistics)
 
 	stats.NumOfFunctions = 0

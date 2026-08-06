@@ -77,6 +77,7 @@ func TestPipeline_Close_BuiltFrom(t *testing.T) {
 		"transform": simulateTransform,
 		"load":      simulateLoad,
 	})
+
 	if err != nil {
 		t.Error(err)
 	}
@@ -91,6 +92,14 @@ func TestPipeline_Close_BuiltFrom(t *testing.T) {
 		}
 	}(i)
 
-	i.Stop()
-	time.Sleep(1 * time.Second)
+	if !i.IsRunning() {
+		t.Error("expected the interactable to be running")
+	}
+
+	i.Stop() // blocks until the pipeline stops
+
+	s := i.GetStatus()
+	if s != Terminated {
+		t.Errorf("expected the interactable to be %s but received %s\n", Terminated, s)
+	}
 }
