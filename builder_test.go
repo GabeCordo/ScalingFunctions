@@ -119,13 +119,13 @@ func Test_BranchAdd_FunctionArgument(t *testing.T) {
 	b := NewBranch().Add(add).Add(mul).Add(prt)
 	b2 := NewBranch().Add(add2).Add(mul)
 
-	pipeline := Build(b, b2)
+	interactable := Build(b, b2)
 
-	if len(pipeline.functions) != 4 {
+	if len(interactable.pipeline.functions) != 4 {
 		t.Error("expected the pipeline to have 4 functions.")
 	}
 
-	if len(pipeline.channels) != 2 {
+	if len(interactable.pipeline.channels) != 2 {
 		t.Error("expected the pipeline to have 2 channels.")
 	}
 }
@@ -373,8 +373,7 @@ func TestStressScenario(t *testing.T) {
 	p2Func := builders.CreateProcessorFunction(5 * time.Nanosecond)
 	lFunc := builders.CreateLoadFunction(1 * time.Millisecond)
 
-	p := Build(gFunc, p1Func, p2Func, lFunc)
-	i := p.Interactable()
+	i := Build(gFunc, p1Func, p2Func, lFunc)
 
 	c := make(chan int)
 

@@ -13,6 +13,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/GabeCordo/ScalingFunctions/internal/flags"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -160,7 +162,7 @@ func (instance *pipelineRuntime) startup() error {
 
 	// the startup function may optionally be provided by the developer.
 	if instance.Pipeline.onStartup != nil {
-		if internal.DEBUG {
+		if flags.DEBUG {
 			log.Println("Running onStartup function")
 		}
 
@@ -288,7 +290,7 @@ func (instance *pipelineRuntime) start() error {
 	instance.event(Startup)
 	defer instance.event(TearedDown)
 
-	if internal.DEBUG {
+	if flags.DEBUG {
 		log.Printf("Starting instance with id: %d", instance.Id)
 	}
 
@@ -556,7 +558,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 
 			function.To.Value.AddProducer()
 
-			if internal.DEBUG {
+			if flags.DEBUG {
 				log.Printf("creating new producer function %d\n", supervisor.Id)
 			}
 
@@ -610,7 +612,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 				}
 			}()
 
-			if internal.DEBUG {
+			if flags.DEBUG {
 				log.Printf("creating new endpoint function %d\n", supervisor.Id)
 			}
 
@@ -698,7 +700,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 
 			function.To.Value.AddProducer()
 
-			if internal.DEBUG {
+			if flags.DEBUG {
 				log.Printf("creating new transformer function %d\n", supervisor.Id)
 			}
 

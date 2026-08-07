@@ -28,8 +28,7 @@ func TestNewStatistics(t *testing.T) {
 
 func TestStatisticPrint(t *testing.T) {
 
-	p := Build(gen, mul, prt)
-	i := p.Interactable()
+	i := Build(gen, mul, prt)
 	i.Run()
 
 	s := i.GetStatistics()

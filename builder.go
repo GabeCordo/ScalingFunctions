@@ -175,13 +175,14 @@ func getBuildVariant(inputs ...any) (variant buildVariant) {
 // Variant 2:   Build(branch1, branch2, ... , branchn-1, branchn)
 //
 // Variant 3:   Build(deployment, repository)
-func Build(input ...any) (pipeline Pipeline) {
+func Build(input ...any) (interactable Interactable) {
 
 	numOfArguments := len(input)
 
 	variant := getBuildVariant(input...)
 
 	var err error = nil
+	var pipeline Pipeline
 
 	switch variant {
 	case functionVariant, functionWrapperVariant:
@@ -212,5 +213,5 @@ func Build(input ...any) (pipeline Pipeline) {
 		panic(err)
 	}
 
-	return pipeline
+	return pipeline.createInteractable()
 }

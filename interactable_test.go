@@ -39,12 +39,11 @@ func simulateLoad(a int) {
 
 func TestPipeline_Close(t *testing.T) {
 
-	p := Build(F{
+	i := Build(F{
 		Id: "extract", Value: simulateExtract},
 		F{Id: "transform", Value: simulateTransform},
 		F{Id: "load", Value: simulateLoad},
 	)
-	i := p.Interactable()
 
 	go func(i Interactable) {
 		err := i.Run()
@@ -82,8 +81,7 @@ func TestPipeline_Close_BuiltFrom(t *testing.T) {
 		t.Error(err)
 	}
 
-	p := Build(&d, r)
-	i := p.Interactable()
+	i := Build(&d, r)
 
 	go func(i Interactable) {
 		err = i.Run()
