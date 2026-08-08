@@ -349,6 +349,22 @@ func Test_PipelineRun_FArgument(t *testing.T) {
 	}
 }
 
+// Test_PipelineRun_InvalidArgument
+// tests that the `Pipeline::Build` function fails when receiving
+// an unexpected argument type.
+func Test_PipelineRun_InvalidArgument(t *testing.T) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("succesfully paniced when Build() received an invalid value")
+		}
+	}()
+
+	var invalidType *int = nil
+	Build(F{Id: "extract", Value: gen}, invalidType)
+	t.Error("expected panic() to be called when an invalid argument is provided")
+}
+
 ////////////////////////////////////////////////////////////////////////
 //							Stress Tests
 ////////////////////////////////////////////////////////////////////////

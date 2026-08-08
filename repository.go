@@ -11,6 +11,10 @@ import (
 	"sync"
 )
 
+const defaultModuleVersion = "v0.0.1"
+
+var FunctionInModuleExistsErr = errors.New("module already has a function with this name")
+
 type Module struct {
 	Name      string
 	Version   string
@@ -24,7 +28,7 @@ func (module *Module) LinkFunction(name string, value any) error {
 	defer module.mutex.Unlock()
 
 	if _, found := module.functions[name]; found {
-		return errors.New("module already has a function with this name")
+		return FunctionInModuleExistsErr
 	} else {
 		module.functions[name] = F{Id: name, Value: value}
 	}
@@ -84,7 +88,7 @@ func (r *Repository) Module(name string) *Module {
 
 		mod := new(Module)
 		mod.Name = name
-		mod.Version = "v0.0.1"
+		mod.Version = defaultModuleVersion
 		mod.functions = make(map[string]F)
 
 		r.modules[name] = mod

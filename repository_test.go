@@ -7,6 +7,7 @@
 package ScalingFunctions
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -17,6 +18,69 @@ func addTwo(a, b int) int {
 
 func print(a int) {
 	fmt.Println(a)
+}
+
+func TestModule_LinkFunction_ValidFunction(t *testing.T) {
+
+	repository := NewRepository()
+	if repository == nil {
+		t.Error("received a nil Repository* pointer")
+	}
+
+	module := repository.Module("common")
+	if module == nil {
+		t.Error("received a nil Module* pointer")
+	}
+
+	genericId := "foo"
+	genericFunc := func() {}
+
+	err := module.LinkFunction(genericId, genericFunc)
+	if err != nil {
+		t.Error("expected a non-nil return type")
+	}
+
+	if len(module.functions) != 1 {
+		t.Error("expected the number of functions in the module to be 1")
+	}
+
+	if module.functions[genericId].Id != genericId {
+		t.Errorf("expected an internal mapping of '%s' inside the module\n", genericId)
+	}
+}
+
+func TestModule_LinkFunction_DuplicateFunction(t *testing.T) {
+
+	repository := NewRepository()
+	if repository == nil {
+		t.Error("received a nil Repository* pointer")
+	}
+
+	module := repository.Module("common")
+	if module == nil {
+		t.Error("received a nil Module* pointer")
+	}
+
+	genericId := "foo"
+	genericFunc := func() {}
+
+	err := module.LinkFunction(genericId, genericFunc)
+	if err != nil {
+		t.Error("expected a non-nil return type")
+	}
+
+	err = module.LinkFunction(genericId, genericFunc)
+	if !errors.Is(err, FunctionInModuleExistsErr) {
+		t.Errorf("expected an err return type of type '%s'\n", FunctionInModuleExistsErr.Error())
+	}
+
+	if len(module.functions) != 1 {
+		t.Error("expected the number of functions in the module to be 1")
+	}
+
+	if module.functions[genericId].Id != genericId {
+		t.Errorf("expected an internal mapping of '%s' inside the module\n", genericId)
+	}
 }
 
 func TestModule_GetIR(t *testing.T) {
@@ -40,5 +104,91 @@ func TestModule_GetIR(t *testing.T) {
 			t.Error("expected the moduleIR to have an identifier of 'print'")
 		}
 
+	}
+}
+
+func TestRepository_NewRepository(t *testing.T) {
+
+	repository := NewRepository()
+	if repository == nil {
+		t.Error("expected a valid Repository* returned")
+	}
+
+	if repository.modules == nil {
+		t.Error("expected the Repository::modules field ot be intialized")
+	}
+
+	if len(repository.modules) != 0 {
+		t.Error("expected the Repository::modules field to be initialized to a size of zero")
+	}
+}
+
+func TestRepository_Module(t *testing.T) {
+
+	repository := NewRepository()
+	if repository == nil {
+		t.Error("expected a valid Repository* returned")
+	}
+
+	moduleName := "common"
+	commonModule := repository.Module(moduleName)
+	if commonModule == nil {
+		t.Error("expected a valid Module* returned")
+	}
+
+	if commonModule.Name != moduleName {
+		t.Errorf("expected the module name '%s' but received '%s'\n",
+			moduleName, commonModule.Name)
+	}
+
+	if commonModule.Version != defaultModuleVersion {
+		t.Errorf("expected the module version '%s' but received '%s'\n",
+			defaultModuleVersion, commonModule.Version)
+	}
+
+	if commonModule.functions == nil {
+		t.Error("expected Module::functions to be initialized")
+	}
+
+	if len(commonModule.functions) != 0 {
+		t.Error("expected Module::functinos to be initialized to a size of zero")
+	}
+
+	if repository.modules[moduleName] != commonModule {
+		t.Error("expected an internal mapping in repository from name -> object")
+	}
+}
+
+func TestRepository_GetModules(t *testing.T) {
+
+	repository := NewRepository()
+	if repository == nil {
+		t.Error("expected a valid Repository* returned")
+	}
+
+	m1 := repository.Module("foo")
+	if m1 == nil {
+		t.Error("expected a valid Module* returned")
+	}
+
+	m2 := repository.Module("bar")
+	if m2 == nil {
+		t.Error("expected a valid Module* returned")
+	}
+
+	mm := repository.GetModules()
+
+	if mm == nil {
+		t.Error("expected a valid array returned from GetModules()")
+	}
+
+	if len(mm) != 2 {
+		t.Error("expected an array of size 2 from GetModules()")
+	}
+
+	for _, m := range mm {
+		if (m.Name != m1.Name) && (m.Name != m2.Name) {
+			t.Error("GetModules() returned a module that is unknown")
+		}
 	}
 }
