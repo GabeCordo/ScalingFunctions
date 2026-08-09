@@ -9,6 +9,9 @@ package ScalingFunctions
 import (
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/GabeCordo/ScalingFunctions/internal/builders"
 )
 
 func generateValidModuleIR() *ModuleIR {
@@ -16,6 +19,65 @@ func generateValidModuleIR() *ModuleIR {
 		Identifier: "common",
 		Version:    "v0.1",
 		Functions:  make([]FunctionIR, 0),
+	}
+}
+
+////////////////////////////////////////////////////////////////////////
+//
+// Test  buildPipelineIR( ... )
+//	 ∟ Test_buildPipelineIR_NoBranches
+//	 ∟ Test_buildPipelineIR_ValidBranche
+//
+////////////////////////////////////////////////////////////////////////
+
+func Test_buildPipelineIR_NoBranches(t *testing.T) {
+
+	pipelineIR, err := buildPipelineIR()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if pipelineIR.Pipes == nil {
+		t.Error("expected pipelineIR::Pipes to be non nil")
+	}
+
+	if len(pipelineIR.Pipes) != 0 {
+		t.Error("expected size of pipelineIR::Pipes to be zero")
+	}
+
+	if pipelineIR.Functions == nil {
+		t.Error("expected pipelineIR::Functions to be non nil")
+	}
+
+	if len(pipelineIR.Functions) != 0 {
+		t.Error("expected size of pipelineIR::Functions to be zero")
+	}
+}
+
+func Test_buildPipelineIR_ValidBranche(t *testing.T) {
+
+	startFunc := builders.CreateGeneratorFunction(1*time.Millisecond, 10)
+	branch := NewBranch().Add(startFunc)
+
+	pipelineIR, err := buildPipelineIR(branch)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if pipelineIR.Pipes == nil {
+		t.Error("expected pipelineIR::Pipes to be non nil")
+	}
+
+	if len(pipelineIR.Pipes) != 0 {
+		t.Error("expected size of pipelineIR::Pipes to be 0")
+	}
+
+	if pipelineIR.Functions == nil {
+		t.Error("expected pipelineIR::Functions to be non nil")
+	}
+
+	if len(pipelineIR.Functions) != 1 {
+		t.Error("expected size of pipelineIR::Functions to be 1")
 	}
 }
 

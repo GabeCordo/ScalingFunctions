@@ -4,14 +4,25 @@
 // All rights reserved.
 //
 // Source file:  ir.go
+
 package ScalingFunctions
+
+////////////////////////////////////////////////////////////////////////
+//
+// Types:
+//	 ∟ FunctionIR	:	describes the signature of a function in a pipeline.
+//	 ∟ PipeIR		:	describes the connection between 2-* functions in a pipeline.
+//	 ∟ PipelineIR	:	describes a set of function and pipes.
+//	 ∟ ContactIR	:	describes the creator of a module.
+//	 ∟ ModuleIR		:	describes a set of pipelines.
+//
+////////////////////////////////////////////////////////////////////////
 
 import (
 	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
-	"sync"
 )
 
 ////////////////////////////////////////////////////////////////////////
@@ -418,70 +429,4 @@ func CleanupIR(ir any) error {
 	}
 
 	return nil
-}
-
-type TestReport struct {
-	Success bool   `json:"success"`
-	Step    string `json:"step"`
-	Cause   error  `json:"cause"`
-}
-
-func (interactable Interactable) Test(data any, injectables ...any) TestReport {
-
-	if interactable.pipeline.flags.interactableCreated {
-		return TestReport{
-			Success: false,
-			Cause:   NonOwningPipeline,
-		}
-	}
-
-	interactable.runtime.injectDependencies(injectables...)
-
-	// instructs pipeline to enable testing
-	interactable.runtime.isForTesting()
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		interactable.runtime.start()
-		wg.Done()
-	}()
-
-	interactable.runtime.send(data)
-	interactable.runtime.close()
-
-	wg.Wait()
-
-	return interactable.runtime.testingReport
-}
-
-func (interactable Interactable) TestAs(f string, data any, injectables ...any) TestReport {
-
-	if interactable.pipeline.flags.interactableCreated {
-		return TestReport{
-			Success: false,
-			Cause:   NonOwningPipeline,
-		}
-	}
-
-	interactable.runtime.injectDependencies(injectables...)
-
-	// instructs pipeline to enable testing
-	interactable.runtime.isForTesting()
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		interactable.runtime.start()
-		wg.Done()
-	}()
-
-	interactable.runtime.send(data, f)
-	interactable.runtime.close()
-
-	wg.Wait()
-
-	return interactable.runtime.testingReport
 }

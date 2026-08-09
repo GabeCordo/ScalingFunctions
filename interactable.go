@@ -6,6 +6,8 @@
 // Source file:  interactable.go
 package ScalingFunctions
 
+import "sync"
+
 ////////////////////////////////////////////////////////////////////////
 //							Interactable
 ////////////////////////////////////////////////////////////////////////
@@ -49,4 +51,70 @@ func (interactable Interactable) Stop() {
 func (interactable Interactable) GetStatistics() *Statistics {
 
 	return interactable.pipeline.Stats
+}
+
+type TestReport struct {
+	Success bool   `json:"success"`
+	Step    string `json:"step"`
+	Cause   error  `json:"cause"`
+}
+
+func (interactable Interactable) Test(data any, injectables ...any) TestReport {
+
+	if interactable.pipeline.flags.interactableCreated {
+		return TestReport{
+			Success: false,
+			Cause:   NonOwningPipeline,
+		}
+	}
+
+	interactable.runtime.injectDependencies(injectables...)
+
+	// instructs pipeline to enable testing
+	interactable.runtime.isForTesting()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		interactable.runtime.start()
+		wg.Done()
+	}()
+
+	interactable.runtime.send(data)
+	interactable.runtime.close()
+
+	wg.Wait()
+
+	return interactable.runtime.testingReport
+}
+
+func (interactable Interactable) TestAs(f string, data any, injectables ...any) TestReport {
+
+	if interactable.pipeline.flags.interactableCreated {
+		return TestReport{
+			Success: false,
+			Cause:   NonOwningPipeline,
+		}
+	}
+
+	interactable.runtime.injectDependencies(injectables...)
+
+	// instructs pipeline to enable testing
+	interactable.runtime.isForTesting()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		interactable.runtime.start()
+		wg.Done()
+	}()
+
+	interactable.runtime.send(data, f)
+	interactable.runtime.close()
+
+	wg.Wait()
+
+	return interactable.runtime.testingReport
 }

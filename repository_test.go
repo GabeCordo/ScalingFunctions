@@ -20,7 +20,15 @@ func print(a int) {
 	fmt.Println(a)
 }
 
-func TestModule_LinkFunction_ValidFunction(t *testing.T) {
+////////////////////////////////////////////////////////////////////////
+//
+// Test  Module::LinkFunction( ... )
+//	 ∟ Test_Module_LinkFunction_ValidFunction
+//	 ∟ Test_Module_LinkFunction_DuplicateFunction
+//
+////////////////////////////////////////////////////////////////////////
+
+func Test_Module_LinkFunction_ValidFunction(t *testing.T) {
 
 	repository := NewRepository()
 	if repository == nil {
@@ -49,7 +57,7 @@ func TestModule_LinkFunction_ValidFunction(t *testing.T) {
 	}
 }
 
-func TestModule_LinkFunction_DuplicateFunction(t *testing.T) {
+func Test_Module_LinkFunction_DuplicateFunction(t *testing.T) {
 
 	repository := NewRepository()
 	if repository == nil {
@@ -83,7 +91,14 @@ func TestModule_LinkFunction_DuplicateFunction(t *testing.T) {
 	}
 }
 
-func TestModule_GetIR(t *testing.T) {
+////////////////////////////////////////////////////////////////////////
+//
+// Test  Module::GetIR( ... )
+//	 ∟ Test_Module_GetIR
+//
+////////////////////////////////////////////////////////////////////////
+
+func Test_Module_GetIR(t *testing.T) {
 
 	repository := NewRepository()
 	mod := repository.Module("common")
@@ -107,7 +122,14 @@ func TestModule_GetIR(t *testing.T) {
 	}
 }
 
-func TestRepository_NewRepository(t *testing.T) {
+////////////////////////////////////////////////////////////////////////
+//
+// Test NewRepository( ... )
+//	 ∟ Test_NewRepository
+//
+////////////////////////////////////////////////////////////////////////
+
+func Test_NewRepository(t *testing.T) {
 
 	repository := NewRepository()
 	if repository == nil {
@@ -123,7 +145,14 @@ func TestRepository_NewRepository(t *testing.T) {
 	}
 }
 
-func TestRepository_Module(t *testing.T) {
+////////////////////////////////////////////////////////////////////////
+//
+// Test Repository::Module( ... )
+//	 ∟ Test_Repository_Module_VerifyDefaultFields
+//
+////////////////////////////////////////////////////////////////////////
+
+func Test_Repository_Module_VerifyDefaultFields(t *testing.T) {
 
 	repository := NewRepository()
 	if repository == nil {
@@ -159,7 +188,14 @@ func TestRepository_Module(t *testing.T) {
 	}
 }
 
-func TestRepository_GetModules(t *testing.T) {
+////////////////////////////////////////////////////////////////////////
+//
+// Test Repository::GetModules( ... )
+//	 ∟ Test_Repository_GetModules_ValidateNumOfModules
+//
+////////////////////////////////////////////////////////////////////////
+
+func Test_Repository_GetModules_ValidateNumOfModules(t *testing.T) {
 
 	repository := NewRepository()
 	if repository == nil {
