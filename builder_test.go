@@ -119,13 +119,13 @@ func Test_BranchAdd_FunctionArgument(t *testing.T) {
 	b := NewBranch().Add(add).Add(mul).Add(prt)
 	b2 := NewBranch().Add(add2).Add(mul)
 
-	pipeline := Build(b, b2)
+	interactable := Build(b, b2)
 
-	if len(pipeline.functions) != 4 {
+	if len(interactable.pipeline.functions) != 4 {
 		t.Error("expected the pipeline to have 4 functions.")
 	}
 
-	if len(pipeline.channels) != 2 {
+	if len(interactable.pipeline.channels) != 2 {
 		t.Error("expected the pipeline to have 2 channels.")
 	}
 }
@@ -350,6 +350,120 @@ func Test_PipelineRun_FArgument(t *testing.T) {
 }
 
 ////////////////////////////////////////////////////////////////////////
+//
+// Test  Build( ... )
+//	 ∟ Test_Build_FunctionFollowedByInvalidArgument
+//	 ∟ Test_Build_FunctionWrapperFollowedByInvalidArgument
+//	 ∟ Test_Build_BranchFollowedByInvalidArgument
+//	 ∟ Test_Build_RepositoryFollowedByInvalidArgument
+//	 ∟ Test_Build_ConfigFollowedByInvalidArgument
+// 	 ∟ Test_Build_InvalidArgument
+//
+////////////////////////////////////////////////////////////////////////
+
+// Test_Build_FunctionFollowedByInvalidArgument
+// tests that the `Pipeline::Build` function fails when receiving a
+// an unexpected argument after a valid function.
+func Test_Build_FunctionFollowedByInvalidArgument(t *testing.T) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("succesfully paniced when Build() received an invalid value")
+		}
+	}()
+
+	var invalidType *int = nil
+	Build(gen, invalidType)
+	t.Error("expected panic() to be called when an invalid argument is provided")
+}
+
+// Test_Build_FunctionWrapperFollowedByInvalidArgument
+// tests that the `Pipeline::Build` function fails when receiving a
+// an unexpected argument after a valid function wrapper.
+func Test_Build_FunctionWrapperFollowedByInvalidArgument(t *testing.T) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("succesfully paniced when Build() received an invalid value")
+		}
+	}()
+
+	var invalidType *int = nil
+	Build(F{Id: "extract", Value: gen}, invalidType)
+	t.Error("expected panic() to be called when an invalid argument is provided")
+}
+
+// Test_Build_BranchFollowedByInvalidArgument
+// tests that the `Pipeline::Build` function fails when receiving a
+// an unexpected argument after a valid branch.
+func Test_Build_BranchFollowedByInvalidArgument(t *testing.T) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("succesfully paniced when Build() received an invalid value")
+		}
+	}()
+
+	branch := NewBranch()
+
+	var invalidType *int = nil
+	Build(branch, invalidType)
+	t.Error("expected panic() to be called when an invalid argument is provided")
+}
+
+// Test_Build_RepositoryFollowedByInvalidArgument
+// tests that the `Pipeline::Build` function fails when receiving a
+// an unexpected argument after a valid repository.
+func Test_Build_RepositoryFollowedByInvalidArgument(t *testing.T) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("succesfully paniced when Build() received an invalid value")
+		}
+	}()
+
+	repository := NewRepository()
+
+	var invalidType *int = nil
+	Build(repository, invalidType)
+	t.Error("expected panic() to be called when an invalid argument is provided")
+}
+
+// Test_Build_ConfigFollowedByInvalidArgument
+// tests that the `Pipeline::Build` function fails when receiving a
+// an unexpected argument after a valid config.
+func Test_Build_ConfigFollowedByInvalidArgument(t *testing.T) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("succesfully paniced when Build() received an invalid value")
+		}
+	}()
+
+	pipelineIR := &PipelineIR{}
+
+	var invalidType *int = nil
+	Build(&pipelineIR, invalidType)
+	t.Error("expected panic() to be called when an invalid argument is provided")
+}
+
+// Test_Build_InvalidArgument
+// tests that the `Pipeline::Build` function fails when receiving a
+// an invalid argument.
+func Test_Build_InvalidArgument(t *testing.T) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("succesfully paniced when Build() received an invalid value")
+		}
+	}()
+
+	var invalidType *int = nil
+	Build(invalidType)
+	t.Error("expected panic() to be called when an invalid argument is provided")
+}
+
+////////////////////////////////////////////////////////////////////////
 //							Stress Tests
 ////////////////////////////////////////////////////////////////////////
 //
@@ -373,8 +487,7 @@ func TestStressScenario(t *testing.T) {
 	p2Func := builders.CreateProcessorFunction(5 * time.Nanosecond)
 	lFunc := builders.CreateLoadFunction(1 * time.Millisecond)
 
-	p := Build(gFunc, p1Func, p2Func, lFunc)
-	i := p.Interactable()
+	i := Build(gFunc, p1Func, p2Func, lFunc)
 
 	c := make(chan int)
 

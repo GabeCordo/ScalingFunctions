@@ -1,5 +1,7 @@
 # ScalingFunctions Framework
 
+<img src="./docs/assets/Pangolin_Icon.svg" width="50%">
+
 An open source framework for building multithreaded data pipelines. 
 
 scaling functions provides fine-grained control over the deployment of vertically scalable pipelines to control: how they

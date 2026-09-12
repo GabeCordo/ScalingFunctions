@@ -4,7 +4,19 @@
 // All rights reserved.
 //
 // Source file:  ir.go
+
 package ScalingFunctions
+
+////////////////////////////////////////////////////////////////////////
+//
+// Types:
+//	 ∟ FunctionIR	:	describes the signature of a function in a pipeline.
+//	 ∟ PipeIR		:	describes the connection between 2-* functions in a pipeline.
+//	 ∟ PipelineIR	:	describes a set of function and pipes.
+//	 ∟ ContactIR	:	describes the creator of a module.
+//	 ∟ ModuleIR		:	describes a set of pipelines.
+//
+////////////////////////////////////////////////////////////////////////
 
 import (
 	"errors"

@@ -247,7 +247,7 @@ func buildPipeline(iR *PipelineIR) (Pipeline, error) {
 //
 ////////////////////////////////////////////////////////////////////////
 
-func (pipeline Pipeline) Interactable() Interactable {
+func (pipeline Pipeline) createInteractable() Interactable {
 
 	runtime := newPipelineRuntime(pipeline)
 	interactable := Interactable{
@@ -259,84 +259,4 @@ func (pipeline Pipeline) Interactable() Interactable {
 
 	pipeline.flags.interactableCreated = true
 	return interactable
-}
-
-func (pipeline Pipeline) Run(injectables ...any) error {
-
-	if pipeline.flags.interactableCreated {
-		return NonOwningPipeline
-	}
-
-	runtime := newPipelineRuntime(pipeline)
-	runtime.injectDependencies(injectables...)
-
-	return runtime.start()
-}
-
-type TestReport struct {
-	Success bool   `json:"success"`
-	Step    string `json:"step"`
-	Cause   error  `json:"cause"`
-}
-
-func (pipeline Pipeline) Test(data any, injectables ...any) TestReport {
-
-	if pipeline.flags.interactableCreated {
-		return TestReport{
-			Success: false,
-			Cause:   NonOwningPipeline,
-		}
-	}
-
-	runtime := newPipelineRuntime(pipeline)
-	runtime.injectDependencies(injectables...)
-
-	// instructs pipeline to enable testing
-	runtime.isForTesting()
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		runtime.start()
-		wg.Done()
-	}()
-
-	runtime.send(data)
-	runtime.close()
-
-	wg.Wait()
-
-	return runtime.testingReport
-}
-
-func (pipeline Pipeline) TestAs(f string, data any, injectables ...any) TestReport {
-
-	if pipeline.flags.interactableCreated {
-		return TestReport{
-			Success: false,
-			Cause:   NonOwningPipeline,
-		}
-	}
-
-	runtime := newPipelineRuntime(pipeline)
-	runtime.injectDependencies(injectables...)
-
-	// instructs pipeline to enable testing
-	runtime.isForTesting()
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		runtime.start()
-		wg.Done()
-	}()
-
-	runtime.send(data, f)
-	runtime.close()
-
-	wg.Wait()
-
-	return runtime.testingReport
 }

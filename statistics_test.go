@@ -10,7 +10,14 @@ import (
 	"testing"
 )
 
-func TestNewStatistics(t *testing.T) {
+////////////////////////////////////////////////////////////////////////
+//
+// Test  NewStatistics( ... )
+//	 ∟ Test_NewStatistics
+//
+////////////////////////////////////////////////////////////////////////
+
+func Test_NewStatistics(t *testing.T) {
 
 	var numOfFuncs uint16 = 1
 	var numOfPipes uint16 = 1
@@ -26,13 +33,18 @@ func TestNewStatistics(t *testing.T) {
 	}
 }
 
-func TestStatisticPrint(t *testing.T) {
+////////////////////////////////////////////////////////////////////////
+//
+// Test  Statistic::Print( ... )
+//	 ∟ Test_NewStatistics
+//
+////////////////////////////////////////////////////////////////////////
 
-	p := Build(gen, mul, prt)
-	i := p.Interactable()
+func Test_Statistic_Print(t *testing.T) {
+
+	i := Build(gen, mul, prt)
 	i.Run()
 
 	s := i.GetStatistics()
 	s.Print()
-
 }
