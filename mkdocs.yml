@@ -1,7 +1,0 @@
-site_name: ScalingFunctions
-nav:
-  - Home: index.md
-theme:
-  name: material
-extra_css:
-  - stylesheets/extra.css
