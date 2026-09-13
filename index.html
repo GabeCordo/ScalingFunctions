@@ -1,0 +1,2845 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>ScalingFunctions: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/GabeCordo/ScalingFunctions/branch.go (100.0%)</option>
+				
+				<option value="file1">github.com/GabeCordo/ScalingFunctions/builder.go (91.3%)</option>
+				
+				<option value="file2">github.com/GabeCordo/ScalingFunctions/channel.go (100.0%)</option>
+				
+				<option value="file3">github.com/GabeCordo/ScalingFunctions/examples/three-consumers/main.go (0.0%)</option>
+				
+				<option value="file4">github.com/GabeCordo/ScalingFunctions/interactable.go (18.8%)</option>
+				
+				<option value="file5">github.com/GabeCordo/ScalingFunctions/internal/builders/builders.go (100.0%)</option>
+				
+				<option value="file6">github.com/GabeCordo/ScalingFunctions/ir.go (91.0%)</option>
+				
+				<option value="file7">github.com/GabeCordo/ScalingFunctions/pipeline.go (91.0%)</option>
+				
+				<option value="file8">github.com/GabeCordo/ScalingFunctions/repository.go (97.4%)</option>
+				
+				<option value="file9">github.com/GabeCordo/ScalingFunctions/runtime.go (58.6%)</option>
+				
+				<option value="file10">github.com/GabeCordo/ScalingFunctions/statistics.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2024-2025. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  branch.go
+package ScalingFunctions
+
+import (
+        "errors"
+        "reflect"
+)
+
+////////////////////////////////////////////////////////////////////////
+//                                                Branch Constants
+////////////////////////////////////////////////////////////////////////
+
+// defaultStaticMount
+// is the default metadata mount type for a function.
+const defaultStaticMount = true
+
+////////////////////////////////////////////////////////////////////////
+//                                                Branch Errors
+////////////////////////////////////////////////////////////////////////
+
+var IsNotFunc = errors.New("passed value must be of type function")
+
+////////////////////////////////////////////////////////////////////////
+//                                                Branch Types
+////////////////////////////////////////////////////////////////////////
+
+// Step
+// is a channelDataWrapper to associate a function to a string identifier.
+type Step struct {
+        id    string
+        value any
+        max   uint16
+}
+
+// Branch
+// is a series of functions chained one after another.
+type Branch struct {
+        steps []Step
+}
+
+// M
+// is a collection of metadata that is bound to a function.
+type M struct {
+        id string
+}
+
+// F
+// is metadata tightly coupled with a function.
+type F struct {
+        Id    string
+        Max   uint16
+        Value any
+}
+
+////////////////////////////////////////////////////////////////////////
+//                                                Branch Functions
+////////////////////////////////////////////////////////////////////////
+
+// GetIR
+// returns the intermidary representation of the `F` object.
+func (f F) GetIR() FunctionIR <span class="cov3" title="3">{
+
+        ir := FunctionIR{}
+        ir.Identifier = f.Id
+        ir.Metadata.StaticMount = defaultStaticMount
+        ir.Maximum = f.Max
+
+        reflected := reflect.TypeOf(f.Value)
+
+        numOfParameters := reflected.NumIn()
+        ir.Parameters = make([]string, numOfParameters)
+        for i := 0; i &lt; numOfParameters; i++ </span><span class="cov4" title="4">{
+                ir.Parameters[i] = reflected.In(i).String()
+        }</span>
+
+        <span class="cov3" title="3">numOfReturns := reflected.NumOut()
+        ir.Returns = make([]string, numOfReturns)
+        for i := 0; i &lt; numOfReturns; i++ </span><span class="cov3" title="3">{
+                ir.Returns[i] = reflected.Out(i).String()
+        }</span>
+
+        <span class="cov3" title="3">return ir</span>
+}
+
+// Add
+// allows the developer to define new function steps using the builder pattern.
+func (b *Branch) Add(data any) *Branch <span class="cov10" title="33">{
+
+        var v reflect.Value
+        var k reflect.Kind
+
+        var s Step
+
+        if w, isWrapperType := data.(F); isWrapperType </span><span class="cov6" title="9">{
+                v = reflect.ValueOf(w.Value)
+                k = v.Kind()
+
+                s.id = w.Id
+                s.value = w.Value
+                s.max = w.Max
+        }</span> else<span class="cov9" title="24"> {
+                v = reflect.ValueOf(data)
+                k = v.Kind()
+
+                s.id = v.String()
+                s.value = data
+                s.max = ^uint16(0) // Fetch the max uint16 value.
+        }</span>
+
+        <span class="cov10" title="33">if k != reflect.Func </span><span class="cov1" title="1">{
+                panic(IsNotFunc)</span>
+        }
+        <span class="cov9" title="32">b.steps = append(b.steps, s)
+
+        return b</span>
+}
+
+// NewBranch
+// is a constructor function that initializes heap memory for a Branch.
+func NewBranch() *Branch <span class="cov7" title="14">{
+
+        b := new(Branch)
+        b.steps = make([]Step, 0)
+
+        return b
+}</span>
+
+// B
+// is syntactic-sugar function that makes it simpler to define complex pipelines.
+func B(values ...any) *Branch <span class="cov3" title="3">{
+
+        b := NewBranch()
+        for _, v := range values </span><span class="cov3" title="3">{
+                b.Add(v)
+        }</span>
+
+        <span class="cov3" title="3">return b</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  scalingfunctions.go
+package ScalingFunctions
+
+import (
+        "errors"
+        "log"
+        "reflect"
+)
+
+////////////////////////////////////////////////////////////////////////
+//                                        Scaling Functions Build Types
+////////////////////////////////////////////////////////////////////////
+
+// notableType
+// categorises and input to a lexeme.
+type notableType uint8
+
+const (
+        functionType notableType = iota
+        functionWrapperType
+        branchType
+        deploymentType
+        repositoryType
+        invalidType
+)
+
+// buildVariant
+// describes how the Build function behaves to a set of inputs.
+type buildVariant uint8
+
+const (
+        functionVariant buildVariant = iota
+        functionWrapperVariant
+        branchVariant
+        configVariant
+        invalidVariant
+)
+
+////////////////////////////////////////////////////////////////////////
+//                                  Scaling Functions Build functions
+////////////////////////////////////////////////////////////////////////
+
+// build
+// is a function to generate a RunnablePipeline instance from a set of
+// one to many Branch instances.
+func build(branches ...*Branch) (Pipeline, error) <span class="cov6" title="8">{
+
+        iR, err := buildPipelineIR(branches...)
+        if err != nil </span><span class="cov0" title="0">{
+                return Pipeline{}, err
+        }</span>
+        <span class="cov6" title="8">return buildPipeline(iR)</span>
+}
+
+// buildLinear
+// is a channelDataWrapper function to generate a branch from a set of functions. Instead
+// of requiring the developer to write bloated code, the channelDataWrapper function can
+// be used for simplistic functions that represent a line rather than tree.
+func buildLinear(functions ...any) (Pipeline, error) <span class="cov5" title="5">{
+
+        branch := NewBranch()
+        for _, function := range functions </span><span class="cov8" title="16">{
+                branch.Add(function)
+        }</span>
+        <span class="cov5" title="5">return build(branch)</span>
+}
+
+// buildFrom
+// is a function to generate a runnable Pipeline from Pipeline metadata and repository.
+func buildFrom(deployment *PipelineIR, repository *Repository) (Pipeline, error) <span class="cov3" title="3">{
+
+        metadata, err := buildPipelineIRFrom(deployment, repository)
+        if err != nil </span><span class="cov0" title="0">{
+                return Pipeline{}, err
+        }</span>
+        <span class="cov3" title="3">return buildPipeline(metadata)</span>
+}
+
+// getBuildVariant
+// is a function for parsing the parameters passed to Build and determining
+// what sub-function needs to be called to generate the correct RunnablePipeline instance.
+func getBuildVariant(inputs ...any) (variant buildVariant) <span class="cov8" title="17">{
+
+        variant = invalidVariant
+
+        for idx, input := range inputs </span><span class="cov10" title="35">{
+
+                iType := invalidType
+
+                // what type of value is 'i' that we received?
+                if _, ok := input.(*Branch); ok </span><span class="cov5" title="5">{
+                        iType = branchType
+                }</span> else<span class="cov9" title="30"> if _, ok = input.(*Repository); ok </span><span class="cov4" title="4">{
+                        iType = repositoryType
+                }</span> else<span class="cov9" title="26"> if _, ok = input.(*PipelineIR); ok </span><span class="cov3" title="3">{
+                        iType = deploymentType
+                }</span> else<span class="cov8" title="23"> if _, ok = input.(F); ok </span><span class="cov5" title="7">{
+                        iType = functionWrapperType
+                }</span> else<span class="cov8" title="16"> if reflect.TypeOf(input).Kind() == reflect.Func </span><span class="cov7" title="11">{
+                        iType = functionType
+                }</span> else<span class="cov5" title="5"> {
+                        iType = invalidType
+                }</span>
+
+                // cStatus machine determining whether the provided parameters are valid
+                <span class="cov10" title="35">switch variant </span>{
+                case functionVariant:<span class="cov6" title="8">
+                        </span><span class="cov6" title="8">{
+                                if iType != functionType </span><span class="cov1" title="1">{
+                                        log.Panicf("the parameter at index %d is not a function\n", idx)
+                                }</span>
+                        }
+                case functionWrapperVariant:<span class="cov5" title="5">
+                        </span><span class="cov5" title="5">{
+                                if iType != functionWrapperType </span><span class="cov1" title="1">{
+                                        log.Panicf("the parameter at index %d is not a function channelDataWrapper\n", idx)
+                                }</span>
+                        }
+                case branchVariant:<span class="cov2" title="2">
+                        </span><span class="cov2" title="2">{
+                                if iType != branchType </span><span class="cov1" title="1">{
+                                        log.Panicf("the parameter at index %d is not a branch\n", idx)
+                                }</span>
+                        }
+                case configVariant:<span class="cov3" title="3">
+                        </span><span class="cov3" title="3">{
+                                if iType != repositoryType </span><span class="cov0" title="0">{
+                                        log.Panicf("the parameter at index %d is not a repository\n", idx)
+                                }</span>
+                        }
+                default:<span class="cov8" title="17"> // invalidVariant
+                        </span><span class="cov8" title="17">{
+                                switch iType </span>{
+                                case branchType:<span class="cov4" title="4">
+                                        variant = branchVariant</span>
+                                case functionType:<span class="cov4" title="4">
+                                        variant = functionVariant</span>
+                                case functionWrapperType:<span class="cov3" title="3">
+                                        variant = functionWrapperVariant</span>
+                                case deploymentType:<span class="cov3" title="3">
+                                        variant = configVariant</span>
+                                case repositoryType:<span class="cov1" title="1">
+                                        log.Panicf("the parameter at index %d is a repository; did you mean to provide a deployment first?\n", idx)</span>
+                                default:<span class="cov2" title="2"> // invalidType
+                                        log.Panicf("the parameter at index %d is unexpected\n", idx)</span>
+                                }
+                        }
+                }
+        }
+
+        <span class="cov7" title="11">return variant</span>
+}
+
+////////////////////////////////////////////////////////////////////////
+//                                  Scaling Functions Public functions
+////////////////////////////////////////////////////////////////////////
+//
+//        Build( ... )
+//                ∟ Pipeline  : a runnable instance of the pipeline description
+//                        .Run()  : begins execution of the pipeline
+//                        .Test() : integration test on data passing through the pipeline
+//
+////////////////////////////////////////////////////////////////////////
+
+// Build
+// is a function to create a RunnablePipeline instance from a set of branches or functions.
+//
+// Variant 1:        Build(func1, func2, ... , funcn-1, funcn)
+//
+// Variant 2:   Build(branch1, branch2, ... , branchn-1, branchn)
+//
+// Variant 3:   Build(deployment, repository)
+func Build(input ...any) (interactable Interactable) <span class="cov8" title="17">{
+
+        numOfArguments := len(input)
+
+        variant := getBuildVariant(input...)
+
+        var err error = nil
+        var pipeline Pipeline
+
+        switch variant </span>{
+        case functionVariant, functionWrapperVariant:<span class="cov5" title="5">
+                </span><span class="cov5" title="5">{
+                        pipeline, err = buildLinear(input...)
+                }</span>
+        case branchVariant:<span class="cov3" title="3">
+                </span><span class="cov3" title="3">{
+                        branches := make([]*Branch, numOfArguments)
+                        for i := 0; i &lt; numOfArguments; i++ </span><span class="cov4" title="4">{
+                                branches[i] = (input[i]).(*Branch)
+                        }</span>
+                        <span class="cov3" title="3">pipeline, err = build(branches...)</span>
+                }
+        case configVariant:<span class="cov3" title="3">
+                </span><span class="cov3" title="3">{
+                        d := (input[0]).(*PipelineIR)
+                        r := (input[1]).(*Repository)
+                        pipeline, err = buildFrom(d, r)
+                }</span>
+        default:<span class="cov0" title="0">
+                </span><span class="cov0" title="0">{
+                        err = errors.New("unknown build variant")
+                }</span>
+        }
+
+        <span class="cov7" title="11">if err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+
+        <span class="cov7" title="11">return pipeline.createInteractable()</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  channel.go
+package ScalingFunctions
+
+import (
+        "errors"
+        "reflect"
+        "sync"
+        "time"
+)
+
+////////////////////////////////////////////////////////////////////////
+//                                                  Channel Constants
+////////////////////////////////////////////////////////////////////////
+
+// defaultQueueSize
+// represents the pre allocated size of channels upon initialization.
+const defaultQueueSize = 10000
+
+////////////////////////////////////////////////////////////////////////
+//                                                        Channel Types
+////////////////////////////////////////////////////////////////////////
+
+// channelStatus
+// represents the cStatus of the channel.
+type channelStatus int
+
+const (
+        Empty channelStatus = iota
+        Idle
+        Healthy
+        Underutilized
+        Congested
+        Closed
+)
+
+// ToString
+// converts channelStatus into a human-readable string.
+func (status channelStatus) ToString() string <span class="cov2" title="4">{
+
+        switch status </span>{
+        case Idle:<span class="cov1" title="1">
+                return "Idle"</span>
+        case Empty:<span class="cov1" title="1">
+                return "Empty"</span>
+        case Congested:<span class="cov1" title="1">
+                return "Congested"</span>
+        default:<span class="cov1" title="1">
+                return "Healthy"</span>
+        }
+}
+
+type managedChannelConfig struct {
+        Threshold              uint32
+        UnderutilizedThreshold uint32
+        GrowthFactor           float64
+}
+
+type channelDataWrapper struct {
+        In   time.Time
+        Data []reflect.Value
+}
+
+func (w channelDataWrapper) IsInvalid() bool <span class="cov9" title="3161">{
+        return w.In.IsZero() || w.Data == nil
+}</span>
+
+type managedChannel struct {
+        Name string
+
+        cStatus channelStatus
+        cSize   uint32
+
+        Config managedChannelConfig
+
+        Statistics             *TimingStatistics
+        LastPush               time.Time
+        UnderutilizedThreshold uint32
+        TotalProcessed         uint32
+        NumOfProducers         uint32
+
+        channel chan channelDataWrapper
+
+        cFlags struct {
+                stopNewPushes   bool
+                channelFinished bool
+        }
+
+        cMutexes struct {
+                state    sync.RWMutex // guards writing and closing the channel
+                producer sync.RWMutex // guards 'NumOfProducers' and 'cStatus'
+                size     sync.Mutex   // guards 'cSize', 'TotalProcessed', and statistics.
+        }
+
+        wg sync.WaitGroup
+}
+
+////////////////////////////////////////////////////////////////////////
+//                                                        Channel Functions
+////////////////////////////////////////////////////////////////////////
+
+func newManagedChannel(name string, threshold uint32, growth float64, stats *TimingStatistics) (*managedChannel, error) <span class="cov5" title="38">{
+
+        // The TimingStatistics pointer must not be nil.
+        if stats == nil </span><span class="cov1" title="1">{
+                return nil, errors.New("newManagedChannel passed nil pointer for *TimingStatistics")
+        }</span>
+
+        // The threshold value must be greater or equal to 1
+        <span class="cov5" title="37">if threshold &lt; 1 </span><span class="cov1" title="1">{
+                return nil, errors.New("newManagedChannel received a threshold less than 1")
+        }</span>
+
+        // The growth value must be greater than 1.0
+        <span class="cov4" title="36">if growth &lt;= 1.0 </span><span class="cov1" title="1">{
+                return nil, errors.New("newManagedChannel received a growth less or equal to 1.0")
+        }</span>
+
+        <span class="cov4" title="35">mc := new(managedChannel)
+
+        mc.Name = name
+        mc.Config.Threshold = threshold
+        mc.Config.GrowthFactor = growth
+        mc.TotalProcessed = 0
+
+        // allocate size(channelDataWrapper) * defaultQueueSize in advance to accommodate
+        // the incoming data to the channel
+        mc.channel = make(chan channelDataWrapper, defaultQueueSize)
+        mc.Config.UnderutilizedThreshold = mc.Config.Threshold / 3
+        mc.Statistics = stats
+
+        mc.cFlags.channelFinished = false
+        mc.cFlags.stopNewPushes = false
+        mc.NumOfProducers = 0
+
+        return mc, nil</span>
+}
+
+func (mc *managedChannel) Push(data []reflect.Value) bool <span class="cov9" title="3154">{
+
+        mc.cMutexes.size.Lock()
+
+        // see if we are hitting a threshold and the successive function is
+        // getting overloaded with data units
+        if (mc.cSize + 1) &gt;= mc.Config.Threshold </span><span class="cov9" title="3154">{
+                mc.cMutexes.producer.Lock()
+                mc.cStatus = Congested
+                mc.cMutexes.producer.Unlock()
+        }</span>
+
+        <span class="cov9" title="3154">mc.cSize++
+        mc.TotalProcessed++
+
+        currentTime := time.Now()
+        mc.LastPush = currentTime
+
+        // before writing on the channel we want to release the mutex otherwise
+        // the managed channel can enter a deadlock;
+        //
+        // producer: wants to send more data onto the managedChannel but has to
+        //                         wait until the channel has buffer to allow it
+        //                         -&gt; channel send is blocked
+        //
+        // consumer: wants to read data from the managedChannel and decrement the
+        //                         size but it needs to enter the mutex to do that.
+        //                         -&gt; the mutex on DataPopped() will block waiting for the chance
+        //                                to write to the queue
+        //                                BUT
+        //                                since the producer is waiting to write to the channel and
+        //                                the consumer can't continue pulling data off the queue we
+        //                                enter an infinite deadlock!
+        mc.cMutexes.size.Unlock()
+
+        if data == nil </span><span class="cov1" title="2">{
+                return false
+        }</span>
+
+        // don't push to the channel if it is supposed to be closed
+        <span class="cov9" title="3152">mc.cMutexes.state.RLock()
+        stop := mc.cFlags.stopNewPushes
+        mc.cMutexes.state.RUnlock()
+
+        if stop </span><span class="cov1" title="2">{
+                return false
+        }</span>
+
+        <span class="cov9" title="3150">mc.channel &lt;- channelDataWrapper{In: currentTime, Data: data}
+
+        return true</span>
+}
+
+func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) <span class="cov9" title="3150">{
+
+        mc.cMutexes.size.Lock()
+        defer mc.cMutexes.size.Unlock()
+
+        timeOutOfQueue := time.Now()
+        totalTimeInQueue := timeOutOfQueue.Sub(timeIntoQueue)
+
+        if mc.Statistics.AverageTime != 0 </span><span class="cov9" title="3132">{
+                if totalTimeInQueue &gt; mc.Statistics.MaxTimeBeforePop </span><span class="cov5" title="79">{
+                        mc.Statistics.MaxTimeBeforePop = totalTimeInQueue
+                }</span> else<span class="cov9" title="3053"> if totalTimeInQueue &lt; mc.Statistics.MinTimeBeforePop </span><span class="cov5" title="46">{
+                        mc.Statistics.MinTimeBeforePop = totalTimeInQueue
+                }</span>
+                <span class="cov9" title="3132">mc.Statistics.AverageTime = (mc.Statistics.AverageTime + totalTimeInQueue) / 2</span>
+        } else<span class="cov4" title="18"> {
+                mc.Statistics.AverageTime = totalTimeInQueue
+                mc.Statistics.MedianTime = 0 // TODO: support
+                mc.Statistics.MaxTimeBeforePop = totalTimeInQueue
+                mc.Statistics.MinTimeBeforePop = totalTimeInQueue
+        }</span>
+
+        <span class="cov9" title="3150">mc.cSize--
+        mc.GetState()</span>
+}
+
+func (mc *managedChannel) Accepting() bool <span class="cov2" title="6">{
+
+        mc.cMutexes.size.Lock()
+        defer mc.cMutexes.size.Unlock()
+
+        return !mc.cFlags.stopNewPushes
+}</span>
+
+func (mc *managedChannel) StopPushes() <span class="cov1" title="2">{
+
+        mc.cMutexes.size.Lock()
+        defer mc.cMutexes.size.Unlock()
+
+        mc.cFlags.stopNewPushes = true
+}</span>
+
+func (mc *managedChannel) AddProducer() <span class="cov4" title="23">{
+        mc.cMutexes.producer.Lock()
+        defer mc.cMutexes.producer.Unlock()
+
+        mc.NumOfProducers++
+}</span>
+
+func (mc *managedChannel) ProducerDone() error <span class="cov4" title="24">{
+
+        mc.cMutexes.producer.Lock()
+        defer mc.cMutexes.producer.Unlock()
+
+        // Terminate the function if the call is invalid.
+        if mc.NumOfProducers &lt;= 0 </span><span class="cov1" title="1">{
+                return errors.New("cannot call ProducerDone() when there are no producers")
+        }</span>
+
+        <span class="cov4" title="23">mc.NumOfProducers--
+        if !mc.cFlags.channelFinished &amp;&amp; (mc.NumOfProducers &lt;= 0) </span><span class="cov4" title="23">{
+                mc.cMutexes.state.Lock()
+                mc.cFlags.channelFinished = true
+                mc.cFlags.stopNewPushes = true
+                close(mc.channel)
+                mc.cMutexes.state.Unlock()
+        }</span>
+
+        <span class="cov4" title="23">return nil</span>
+}
+
+func (mc *managedChannel) GetState() channelStatus <span class="cov10" title="3224">{
+
+        mc.cMutexes.producer.Lock()
+        defer mc.cMutexes.producer.Unlock()
+
+        if mc.cFlags.channelFinished </span><span class="cov6" title="167">{
+                mc.cStatus = Closed
+        }</span> else<span class="cov9" title="3057"> if mc.cSize == 0 </span><span class="cov9" title="3048">{
+                if time.Now().Sub(mc.LastPush).Seconds() &gt; 3 </span><span class="cov4" title="21">{
+                        mc.cStatus = Idle
+                }</span> else<span class="cov9" title="3027"> {
+                        mc.cStatus = Empty
+                }</span>
+        } else<span class="cov3" title="9"> if ((mc.cStatus == Congested) || (mc.cStatus == Idle)) &amp;&amp; (mc.cSize &lt; mc.Config.UnderutilizedThreshold) </span><span class="cov1" title="1">{
+                mc.cStatus = Underutilized
+        }</span> else<span class="cov3" title="8"> if mc.cSize &gt; mc.Config.Threshold </span><span class="cov2" title="5">{
+                mc.cStatus = Congested
+        }</span> else<span class="cov2" title="3"> {
+                mc.cStatus = Healthy
+        }</span>
+
+        <span class="cov10" title="3224">return mc.cStatus</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">// Package main
+//
+// Copyright (c) 2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  main.go
+//
+// Description: The three-consumers example demonstrates a pipeline with three consumers
+//
+//        and varrying drain rates.
+package main
+
+import (
+        "encoding/json"
+        "log"
+        "os"
+        "time"
+
+        "github.com/GabeCordo/ScalingFunctions"
+)
+
+////////////////////////////////////////////////////////////////////////////////////////
+//                                                                        Pipeline Functions
+////////////////////////////////////////////////////////////////////////////////////////
+
+func generator(out chan int) <span class="cov0" title="0">{
+        for i := 0; i &lt; 1000000; i++ </span><span class="cov0" title="0">{
+                out &lt;- i
+        }</span>
+        <span class="cov0" title="0">close(out)</span>
+}
+
+func stepOne(in int) (out int) <span class="cov0" title="0">{
+        time.Sleep(1 * time.Microsecond)
+        out = in
+        return in
+}</span>
+
+func stepTwo(in int) (out int) <span class="cov0" title="0">{
+        time.Sleep(5 * time.Microsecond)
+        out = in
+        return in
+}</span>
+
+func stepThree(in int) <span class="cov0" title="0">{
+        time.Sleep(3 * time.Microsecond)
+}</span>
+
+////////////////////////////////////////////////////////////////////////////////////////
+//                                                                          Framework Glue
+////////////////////////////////////////////////////////////////////////////////////////
+
+func main() <span class="cov0" title="0">{
+
+        statistics := make([]ScalingFunctions.Statistics, 0)
+
+        pipeline := ScalingFunctions.Build(generator, stepOne, stepTwo, stepThree)
+
+        go func() </span><span class="cov0" title="0">{
+                for </span><span class="cov0" title="0">{
+                        statistics = append(statistics, *pipeline.GetStatistics())
+                        time.Sleep(100 * time.Millisecond)
+                }</span>
+        }()
+
+        <span class="cov0" title="0">pipeline.Run()
+
+        file, err := os.Create("three-consumers.json")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Panic(err)
+        }</span>
+        <span class="cov0" title="0">defer file.Close()
+
+        // Encodes and writes directly to the open file descriptor
+        err = json.NewEncoder(file).Encode(statistics)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Panic(err)
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  interactable.go
+package ScalingFunctions
+
+import "sync"
+
+////////////////////////////////////////////////////////////////////////
+//                                                        Interactable
+////////////////////////////////////////////////////////////////////////
+//
+//        Interactable
+//                ∟ Id        : a unique id that may be self-assigned after receiving an injectable
+//                ∟ Pipeline  : an identifier for the graph of functions and channels
+//                ∟ pipeline  : used to track a graph of functions and channels
+//                ∟ runtime   : used to track a running pipeline
+//
+////////////////////////////////////////////////////////////////////////
+
+// Interactable
+// is an abstraction used to interact with a running pipeline.
+type Interactable struct {
+        Id       uint64
+        Pipeline string
+        pipeline Pipeline
+        runtime  *pipelineRuntime
+}
+
+func (interactable Interactable) Run(injectables ...any) error <span class="cov9" title="10">{
+
+        interactable.runtime.injectDependencies(injectables...)
+        return interactable.runtime.start()
+}</span>
+
+func (interactable Interactable) GetStatus() RunStatus <span class="cov1" title="1">{
+        return interactable.runtime.Status
+}</span>
+
+func (interactable Interactable) IsRunning() bool <span class="cov1" title="1">{
+        return !((interactable.runtime.Status == Terminated) || (interactable.runtime.Status == Failed))
+}</span>
+
+func (interactable Interactable) Stop() <span class="cov3" title="2">{
+
+        interactable.runtime.close()
+}</span>
+
+func (interactable Interactable) GetStatistics() *Statistics <span class="cov10" title="13">{
+
+        return interactable.pipeline.Stats
+}</span>
+
+type TestReport struct {
+        Success bool   `json:"success"`
+        Step    string `json:"step"`
+        Cause   error  `json:"cause"`
+}
+
+func (interactable Interactable) Test(data any, injectables ...any) TestReport <span class="cov0" title="0">{
+
+        if interactable.pipeline.flags.interactableCreated </span><span class="cov0" title="0">{
+                return TestReport{
+                        Success: false,
+                        Cause:   NonOwningPipeline,
+                }
+        }</span>
+
+        <span class="cov0" title="0">interactable.runtime.injectDependencies(injectables...)
+
+        // instructs pipeline to enable testing
+        interactable.runtime.isForTesting()
+
+        wg := sync.WaitGroup{}
+        wg.Add(1)
+
+        go func() </span><span class="cov0" title="0">{
+                interactable.runtime.start()
+                wg.Done()
+        }</span>()
+
+        <span class="cov0" title="0">interactable.runtime.send(data)
+        interactable.runtime.close()
+
+        wg.Wait()
+
+        return interactable.runtime.testingReport</span>
+}
+
+func (interactable Interactable) TestAs(f string, data any, injectables ...any) TestReport <span class="cov0" title="0">{
+
+        if interactable.pipeline.flags.interactableCreated </span><span class="cov0" title="0">{
+                return TestReport{
+                        Success: false,
+                        Cause:   NonOwningPipeline,
+                }
+        }</span>
+
+        <span class="cov0" title="0">interactable.runtime.injectDependencies(injectables...)
+
+        // instructs pipeline to enable testing
+        interactable.runtime.isForTesting()
+
+        wg := sync.WaitGroup{}
+        wg.Add(1)
+
+        go func() </span><span class="cov0" title="0">{
+                interactable.runtime.start()
+                wg.Done()
+        }</span>()
+
+        <span class="cov0" title="0">interactable.runtime.send(data, f)
+        interactable.runtime.close()
+
+        wg.Wait()
+
+        return interactable.runtime.testingReport</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  builders.go
+
+package builders
+
+import (
+        "time"
+)
+
+var NumberGenerated int = 10
+
+// CreateGeneratorFunction
+// returns a function that generates `numberOfPackets` with a `generationDelay` between packets.
+func CreateGeneratorFunction(generationDelay time.Duration, numOfPackets int) func(chan int) <span class="cov1" title="1">{
+
+        return func(out chan int) </span><span class="cov1" title="1">{
+                for i := 0; i &lt; numOfPackets; i++ </span><span class="cov10" title="10">{
+                        time.Sleep(generationDelay)
+                        out &lt;- i
+                }</span>
+                <span class="cov1" title="1">close(out)</span> // TODO: the framework shoud have it's own timeout in case this is forgotten
+        }
+}
+
+// CreateProcessorFunction
+// returns a function that waits `processingDelay` before returning.
+func CreateProcessorFunction(processingDelay time.Duration) func(int) (int, error) <span class="cov1" title="1">{
+
+        return func(in int) (out int, err error) </span><span class="cov1" title="1">{
+                time.Sleep(processingDelay)
+                out = in
+                return out, nil
+        }</span>
+}
+
+// CreateLoadFunction
+// returns a function that waits `loadDelay` before returning.
+func CreateLoadFunction(loadDelay time.Duration) func(int) error <span class="cov1" title="1">{
+
+        return func(in int) (err error) </span><span class="cov1" title="1">{
+                time.Sleep(loadDelay)
+                return nil
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  ir.go
+
+package ScalingFunctions
+
+////////////////////////////////////////////////////////////////////////
+//
+// Types:
+//         ∟ FunctionIR        :        describes the signature of a function in a pipeline.
+//         ∟ PipeIR                :        describes the connection between 2-* functions in a pipeline.
+//         ∟ PipelineIR        :        describes a set of function and pipes.
+//         ∟ ContactIR        :        describes the creator of a module.
+//         ∟ ModuleIR                :        describes a set of pipelines.
+//
+////////////////////////////////////////////////////////////////////////
+
+import (
+        "errors"
+        "fmt"
+        "reflect"
+        "strconv"
+)
+
+////////////////////////////////////////////////////////////////////////
+//                        Pipeline Intermediary Representation Constants
+////////////////////////////////////////////////////////////////////////
+
+const maximumGoroutinesPerFunction = 1000
+
+////////////////////////////////////////////////////////////////////////
+//                        Pipeline Intermediary Representation Errors
+////////////////////////////////////////////////////////////////////////
+
+var UnsupportedIRVerifyType = errors.New("unsupported IR type for verification")
+var EmptyIdentifier = errors.New("the identifier cannot be empty")
+var EmptyVersion = errors.New("the module version cannot be empty")
+var EmptyCreator = errors.New("the module creator cannot be empty")
+var InvalidVersion = errors.New("the module version must either be of type '0.0.0' or 'v0.0.0'")
+var NamingConflict = errors.New("the module contains functions with duplicate identifiers")
+var UnsupportedIRCleanupType = errors.New("unsupported IR type for verification")
+
+////////////////////////////////////////////////////////////////////////
+//                        Pipeline Intermediary Representation Types
+////////////////////////////////////////////////////////////////////////
+
+// OnCrash
+// describes what should be done when a function fails.
+type OnCrash string
+
+const (
+        Restart   OnCrash = "Restart"
+        DoNothing         = "DoNothing"
+)
+
+// OnLoad
+// describes what a function should do before accepting channel data.
+type OnLoad string
+
+const (
+        CompleteAndPush OnLoad = "CompleteAndPush" // tells a function to immediately process data.
+        WaitAndPush            = "WaitAndPush"     // tells a function to wait for a channel to close before processing data as an array.
+)
+
+// versionType
+// defines the format the version is in.
+type versionType uint8
+
+const (
+        vPrefixedVersionType versionType = iota
+        floatVersionType
+        unknownVersionType
+)
+
+// irType
+// defines what intermediary representation identity of a generic type.
+type irType uint8
+
+const (
+        functionIRType irType = iota
+        pipeIRType
+        pipelineIRType
+        moduleIRType
+        unknownIRType
+)
+
+// FunctionMetadataIR
+// is metadata associated with a FunctionIR
+type FunctionMetadataIR struct {
+        StaticMount bool `json:"static_mount" yaml:"static_mount"`
+}
+
+// FunctionIR
+// is an intermediary representation of a function.
+type FunctionIR struct {
+        Module     string             `json:"module"`
+        Identifier string             `json:"id" yaml:"id"`
+        Metadata   FunctionMetadataIR `json:"metadata" yaml:"metadata"`
+        From       string             `json:"from,omitempty" yaml:"from,omitempty"`             // what pipe a function is sending data to.
+        To         string             `json:"to,omitempty" yaml:"to,omitempty"`                 // which pipe the function is receiving data from.
+        StartWith  uint16             `json:"start_with,omitempty" yaml:"start_with,omitempty"` // start with N instances of the function running in parallel.
+        WaitBefore bool               `json:"wait_before,omitempty" yaml:"wait_before,omitempty"`
+        Maximum    uint16             `json:"maximum,omitempty" yaml:"maximum,omitempty"` // maximum instances of the function that can be run at the same time
+        Parameters []string           `json:"parameters" yaml:"parameters"`
+        Returns    []string           `json:"returns" yaml:"returns"`
+        value      any
+}
+
+// PipeIR
+// is an intermediary representation of a pipe.
+type PipeIR struct {
+        Identifier   string  `json:"id" yaml:"id"`
+        Threshold    uint32  `json:"threshold" yaml:"threshold"`         // the amount of data that must sit idle in a pipe before we consider the pipe congested.
+        GrowthFactor float64 `json:"growth_factor" yaml:"growth_factor"` // the factor the number of receivers will multiply by to reduce congestion in the pipe.
+}
+
+// PipelineIR
+// is an intermediary representation of a pipeline.
+type PipelineIR struct {
+        Identifier string       `json:"id" yaml:"id"`
+        OnCrash    OnCrash      `json:"on_crash,omitempty" yaml:"on_crash,omitempty"`
+        Functions  []FunctionIR `json:"functions" yaml:"functions"`
+        Pipes      []PipeIR     `json:"pipes" yaml:"pipes"`
+        OnStartup  string       `json:"on_startup" yaml:"on_startup,omitempty"`
+        OnTeardown string       `json:"on_teardown" yaml:"on_teardown,omitempty"`
+}
+
+// ContactIR
+// is used to attach contact information to a ModuleIR
+type ContactIR struct {
+        Name  string `json:"name" yaml:"name"`
+        Email string `json:"email" yaml:"email"`
+}
+
+// ModuleIR
+// is an intermediary representation of a module.
+type ModuleIR struct {
+        Identifier string       `json:"id" yaml:"id"`
+        Version    string       `json:"version" yaml:"version"`
+        Contact    ContactIR    `json:"contact" yaml:"contact"`
+        Functions  []FunctionIR `json:"functions" yaml:"functions"`
+}
+
+////////////////////////////////////////////////////////////////////////
+//                        Pipeline Intermediary Representation Functions
+////////////////////////////////////////////////////////////////////////
+
+func buildPipelineIR(branches ...*Branch) (*PipelineIR, error) <span class="cov7" title="10">{
+
+        // memory allocations //
+        iR := new(PipelineIR)
+
+        iR.Pipes = make([]PipeIR, 0)
+        iR.Functions = make([]FunctionIR, 0)
+
+        // default values //
+
+        numOfPipes := 0
+
+        functions := make(map[uintptr]FunctionIR)
+
+        // each branch describes a sequential chain of functions
+        for _, branch := range branches </span><span class="cov7" title="10">{
+
+                numOfSteps := len(branch.steps)
+
+                previousPipe := ""
+
+                // the functions inside each branch can point to other branches
+                for jdx, step := range branch.steps </span><span class="cov10" title="28">{
+
+                        isLastStep := jdx == (numOfSteps - 1)
+
+                        sid := reflect.ValueOf(step.value).Pointer()
+
+                        // is the step function already found?
+                        if _, found := functions[sid]; found &amp;&amp; isLastStep </span><span class="cov1" title="1">{
+                                continue</span>
+                        } else<span class="cov9" title="27"> if found &amp;&amp; !isLastStep </span><span class="cov0" title="0">{
+                                return nil, errors.New("repeated function must be at the end of the branch")
+                        }</span>
+
+                        <span class="cov9" title="27">f := FunctionIR{StartWith: 1, value: step.value}
+                        if step.id != "" </span><span class="cov9" title="27">{
+                                f.Identifier = step.id
+                        }</span> else<span class="cov0" title="0"> {
+                                step.id = fmt.Sprint(sid)
+                                f.Identifier = step.id
+                        }</span>
+                        <span class="cov9" title="27">if (step.max &gt;= 1) &amp;&amp; (step.max &lt;= maximumGoroutinesPerFunction) </span><span class="cov0" title="0">{
+                                f.Maximum = step.max
+                        }</span> else<span class="cov9" title="27"> {
+                                f.Maximum = maximumGoroutinesPerFunction
+                        }</span>
+                        <span class="cov9" title="27">f.From = previousPipe
+
+                        // if the function is not a terminal step we will need to create a channel
+                        // to send data to.
+                        if !isLastStep </span><span class="cov8" title="18">{
+
+                                // check if the next step points to a known branch
+                                nextSid := reflect.ValueOf(branch.steps[jdx+1].value).Pointer()
+
+                                if repeatedFunc, found := functions[nextSid]; found </span><span class="cov1" title="1">{
+                                        // point to an existing pipe
+                                        f.To = repeatedFunc.From
+                                }</span> else<span class="cov8" title="17"> {
+                                        // create a new pipe the function pushes data to //
+                                        p := PipeIR{Identifier: fmt.Sprint(numOfPipes), Threshold: 1, GrowthFactor: 2}
+                                        iR.Pipes = append(iR.Pipes, p)
+
+                                        // declare that the function pushes data to this pipe //
+                                        f.To = fmt.Sprint(numOfPipes)
+
+                                        // update the pipe records //
+                                        previousPipe = fmt.Sprint(numOfPipes)
+                                        numOfPipes++
+                                }</span>
+                        }
+
+                        // add the built function //
+                        <span class="cov9" title="27">iR.Functions = append(iR.Functions, f)
+                        functions[sid] = f</span>
+                }
+
+                <span class="cov7" title="10">previousPipe = ""</span>
+        }
+
+        <span class="cov7" title="10">return iR, nil</span>
+}
+
+func buildPipelineIRFrom(deployment *PipelineIR, repository *Repository) (*PipelineIR, error) <span class="cov3" title="3">{
+
+        if (deployment == nil) || (repository == nil) </span><span class="cov0" title="0">{
+                return nil, errors.New("deployment or repository cannot be nil")
+        }</span>
+
+        <span class="cov3" title="3">for idx := range deployment.Functions </span><span class="cov6" title="9">{
+
+                m, moduleFound := repository.modules[deployment.Functions[idx].Module]
+                if !moduleFound </span><span class="cov0" title="0">{
+                        // TODO : add more descriptions
+                        panic("module not found")</span>
+                }
+
+                <span class="cov6" title="9">f, functionFound := m.functions[deployment.Functions[idx].Identifier]
+                if !functionFound </span><span class="cov0" title="0">{
+                        // TODO : add more description
+                        panic("function module not found")</span>
+                }
+
+                <span class="cov6" title="9">deployment.Functions[idx].value = f.Value
+                if f.Max &gt; 0 </span><span class="cov0" title="0">{
+                        deployment.Functions[idx].Maximum = f.Max
+                }</span>
+        }
+
+        <span class="cov3" title="3">return deployment, nil</span>
+}
+
+////////////////////////////////////////////////////////////////////////
+//             Exported Pipeline Intermediary Representation Functions
+////////////////////////////////////////////////////////////////////////
+
+func findVersionType(version string) versionType <span class="cov6" title="9">{
+
+        if len(version) &lt; 1 </span><span class="cov2" title="2">{
+                return unknownVersionType
+        }</span> else<span class="cov6" title="7"> if version[0] == 'v' </span><span class="cov5" title="6">{
+                return vPrefixedVersionType
+        }</span> else<span class="cov1" title="1"> {
+                return floatVersionType
+        }</span>
+}
+
+func verifyVersionInModule(version string) (err error) <span class="cov6" title="9">{
+
+        vType := findVersionType(version)
+
+        switch vType </span>{
+        case vPrefixedVersionType:<span class="cov5" title="6">
+                </span><span class="cov5" title="6">{
+                        version = version[1 : len(version)-1]
+                        _, e := strconv.ParseFloat(version, 64)
+                        if e != nil </span><span class="cov1" title="1">{
+                                err = InvalidVersion
+                        }</span>
+                }
+        case floatVersionType:<span class="cov1" title="1">
+                </span><span class="cov1" title="1">{
+                        _, e := strconv.ParseFloat(version, 64)
+                        if e != nil </span><span class="cov0" title="0">{
+                                err = InvalidVersion
+                        }</span>
+                }
+        default:<span class="cov2" title="2">
+                </span><span class="cov2" title="2">{
+                        err = EmptyVersion
+                }</span>
+        }
+
+        <span class="cov6" title="9">return err</span>
+}
+
+func verifyModuleIR(ir *ModuleIR) (ee []error) <span class="cov6" title="7">{
+
+        ee = make([]error, 0)
+
+        if ir.Identifier == "" </span><span class="cov1" title="1">{
+                ee = append(ee, EmptyIdentifier)
+        }</span>
+
+        <span class="cov6" title="7">err := verifyVersionInModule(ir.Version)
+        if err != nil </span><span class="cov1" title="1">{
+                ee = append(ee, err)
+        }</span>
+
+        // ensure that every export identifier is unique
+        <span class="cov6" title="7">exports := make(map[string]bool)
+
+        for _, function := range ir.Functions </span><span class="cov4" title="4">{
+                // pull the unique identifier inside the function struct
+                id := function.Identifier
+
+                // see if the unique identifier already exists inside the module
+                if _, found := exports[id]; found </span><span class="cov1" title="1">{
+                        // when there is a unique identifier clash, the module is no longer valid
+                        ee = append(ee, NamingConflict)
+                }</span> else<span class="cov3" title="3"> {
+                        // otherwise, add to the map so that it is easier to detect clashes
+                        exports[id] = true
+                }</span>
+        }
+
+        <span class="cov6" title="7">return ee</span>
+}
+
+func getIRType(ir any) (t irType) <span class="cov8" title="14">{
+
+        var ok bool
+        if _, ok = ir.(*ModuleIR); ok </span><span class="cov6" title="9">{
+                t = moduleIRType
+        }</span> else<span class="cov5" title="5"> if _, ok = ir.(*PipelineIR); ok </span><span class="cov2" title="2">{
+                t = pipelineIRType
+        }</span> else<span class="cov3" title="3"> if _, ok = ir.(*FunctionIR); ok </span><span class="cov1" title="1">{
+                t = functionIRType
+        }</span> else<span class="cov2" title="2"> if _, ok = ir.(*PipeIR); ok </span><span class="cov1" title="1">{
+                t = pipeIRType
+        }</span> else<span class="cov1" title="1"> {
+                t = unknownIRType
+        }</span>
+
+        <span class="cov8" title="14">return t</span>
+}
+
+func VerifyIR(ir any) (errors []error) <span class="cov7" title="11">{
+
+        errors = make([]error, 0)
+
+        switch getIRType(ir) </span>{
+        case moduleIRType:<span class="cov6" title="7">
+                </span><span class="cov6" title="7">{
+                        moduleIR := ir.(*ModuleIR)
+                        errors = append(errors, verifyModuleIR(moduleIR)...)
+                }</span>
+        default:<span class="cov4" title="4">
+                </span><span class="cov4" title="4">{
+                        // the function shall return 'false' when not implemented for other type
+                        errors = append(errors, UnsupportedIRVerifyType)
+                }</span>
+        }
+
+        <span class="cov7" title="11">return errors</span>
+}
+
+func cleanupFunctionIR(functionIR *FunctionIR) <span class="cov2" title="2">{
+
+        if functionIR.Maximum == 0 </span><span class="cov2" title="2">{
+                functionIR.Maximum = 1
+        }</span>
+
+        <span class="cov2" title="2">if functionIR.StartWith == 0 </span><span class="cov2" title="2">{
+                functionIR.StartWith = 1
+        }</span>
+}
+
+func cleanupModuleIR(moduleIR *ModuleIR) <span class="cov2" title="2">{
+
+        err := verifyVersionInModule(moduleIR.Version)
+        if errors.Is(err, EmptyVersion) </span><span class="cov1" title="1">{
+                moduleIR.Version = "v0.0.1"
+        }</span>
+
+        <span class="cov2" title="2">for idx := range moduleIR.Functions </span><span class="cov1" title="1">{
+                cleanupFunctionIR(&amp;moduleIR.Functions[idx])
+        }</span>
+}
+
+func cleanupPipelineIR(pipelineIR *PipelineIR) <span class="cov1" title="1">{
+
+        for idx := range pipelineIR.Functions </span><span class="cov1" title="1">{
+                cleanupFunctionIR(&amp;pipelineIR.Functions[idx])
+        }</span>
+}
+
+// CleanupIR
+// is a function to fix erroneous or malicious modifications to intermediate
+// representations that are received from external sources.
+func CleanupIR(ir any) error <span class="cov3" title="3">{
+
+        switch getIRType(ir) </span>{
+        case moduleIRType:<span class="cov2" title="2">
+                </span><span class="cov2" title="2">{
+                        moduleIR := ir.(*ModuleIR)
+                        cleanupModuleIR(moduleIR)
+                }</span>
+        case pipelineIRType:<span class="cov1" title="1">
+                </span><span class="cov1" title="1">{
+                        pipelineIR := ir.(*PipelineIR)
+                        cleanupPipelineIR(pipelineIR)
+                }</span>
+        default:<span class="cov0" title="0">
+                </span><span class="cov0" title="0">{
+                        return UnsupportedIRCleanupType
+                }</span>
+        }
+
+        <span class="cov3" title="3">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  pipeline.go
+package ScalingFunctions
+
+import (
+        "errors"
+        "reflect"
+        "sync"
+)
+
+////////////////////////////////////////////////////////////////////////
+//                                                        Pipeline Types
+////////////////////////////////////////////////////////////////////////
+//
+//        Pipeline
+//                ∟ pChannel
+//                        ∟ pChannelConfig  : used to build a pChannel
+//                ∟ pFunction
+//                        ∟ pFunctionConfig : used to build a pFunction
+//
+////////////////////////////////////////////////////////////////////////
+
+var NonOwningPipeline = errors.New("function calls on a pipeline are not allowed after an interactable is created")
+
+const pDefaultId uint64 = 0
+
+type pInjectible struct {
+        value reflect.Value
+}
+
+// pChannelConfig
+// holds data required to build a pChannel.
+type pChannelConfig struct {
+        p *PipeIR
+        s *PipeStatistic
+}
+
+// pChannel
+// represents a connection between one-to-many functions.
+type pChannel struct {
+        Identifier string
+        Producers  []*pFunction   `json:"-"`
+        Receiver   []*pFunction   `json:"-"`
+        Stats      *PipeStatistic `json:"-"`
+        Value      *managedChannel
+
+        Config struct {
+                GrowthFactor float64
+                Threshold    uint32
+        } `json:"-"`
+
+        Mutex sync.RWMutex `json:"-"`
+}
+
+// pFunctionConfig
+// holds data required to build a pFunction.
+type pFunctionConfig struct {
+        f        *FunctionIR
+        s        *FunctionStatistic
+        channels []*pChannel
+}
+
+// pFunction
+// represents a callable function that performs a unit of work on data.
+type pFunction struct {
+        Identifier string
+        To         *pChannel
+        From       *pChannel
+        Stats      *FunctionStatistic `json:"-"`
+        Quit       []chan bool        `json:"-"`
+
+        Value     any `json:"-"`
+        Reflected struct {
+                Value reflect.Value
+                Type  reflect.Type
+        } `json:"-"`
+
+        Config struct {
+                StartWith  uint16
+                WaitBefore bool
+                Maximum    uint16
+        } `json:"-"`
+
+        Mutex sync.RWMutex `json:"-"`
+}
+
+// Pipeline
+// represents a graph of pFunction and pChannel linked together.
+type Pipeline struct {
+        identifier string
+
+        roots []*pFunction
+        tails []*pFunction
+
+        channels  []*pChannel
+        functions []*pFunction
+
+        onStartup  *pFunction
+        onTeardown *pFunction
+
+        injected      []*pInjectible
+        numOfInjected int
+
+        flags struct {
+                interactableCreated bool
+        }
+
+        Stats *Statistics
+}
+
+////////////////////////////////////////////////////////////////////////
+//                                                Pipeline Build functions
+////////////////////////////////////////////////////////////////////////
+//
+//        buildPipeline
+//                ∟ buildPChannel
+//                ∟ buildPFunction
+//
+////////////////////////////////////////////////////////////////////////
+
+func buildPChannel(config pChannelConfig) (*pChannel, error) <span class="cov7" title="25">{
+
+        newChan := new(pChannel)
+        var err error
+
+        newChan.Identifier = config.p.Identifier
+        newChan.Config.Threshold = config.p.Threshold
+        newChan.Config.GrowthFactor = config.p.GrowthFactor
+        newChan.Stats = config.s
+        newChan.Value, err = newManagedChannel(newChan.Identifier, config.p.Threshold, config.p.GrowthFactor, &amp;config.s.Timing)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov7" title="25">newChan.Receiver = make([]*pFunction, 0)
+        newChan.Producers = make([]*pFunction, 0)
+
+        return newChan, nil</span>
+}
+
+func buildPFunction(config pFunctionConfig) (*pFunction, error) <span class="cov8" title="38">{
+
+        function := new(pFunction)
+
+        function.Identifier = config.f.Identifier
+        if config.f.StartWith != 0 </span><span class="cov8" title="38">{
+                function.Config.StartWith = config.f.StartWith
+        }</span> else<span class="cov0" title="0"> {
+                function.Config.StartWith = 1
+        }</span>
+        <span class="cov8" title="38">function.Config.WaitBefore = config.f.WaitBefore
+        function.Config.Maximum = config.f.Maximum
+        function.Stats = config.s
+        function.Quit = make([]chan bool, 0)
+        function.Value = config.f.value
+        function.Reflected.Value = reflect.ValueOf(function.Value)
+        function.Reflected.Type = reflect.TypeOf(function.Value)
+
+        function.To = nil
+        function.From = nil
+        for _, c := range config.channels </span><span class="cov10" title="80">{
+                if c.Identifier == config.f.To </span><span class="cov7" title="26">{
+                        c.Producers = append(c.Producers, function)
+                        function.To = c
+                }</span>
+
+                <span class="cov10" title="80">if c.Identifier == config.f.From </span><span class="cov7" title="25">{
+                        c.Receiver = append(c.Receiver, function)
+                        function.From = c
+                }</span>
+        }
+
+        <span class="cov8" title="38">return function, nil</span>
+}
+
+func buildPipeline(iR *PipelineIR) (Pipeline, error) <span class="cov6" title="13">{
+
+        graph := Pipeline{}
+        graph.identifier = iR.Identifier
+
+        // todo : this mem allocation should not be here
+        graph.Stats = NewStatistics(uint16(len(iR.Functions)), uint16(len(iR.Pipes)))
+
+        graph.channels = make([]*pChannel, len(iR.Pipes))
+        for i, c := range iR.Pipes </span><span class="cov7" title="25">{
+                config := pChannelConfig{
+                        p: &amp;c,
+                        s: &amp;graph.Stats.Pipes[i],
+                }
+                newChan, err := buildPChannel(config)
+                if err != nil </span><span class="cov0" title="0">{
+                        return Pipeline{}, err
+                }</span>
+                <span class="cov7" title="25">graph.channels[i] = newChan</span>
+        }
+
+        <span class="cov6" title="13">graph.roots = make([]*pFunction, 0)
+        graph.tails = make([]*pFunction, 0)
+        graph.functions = make([]*pFunction, len(iR.Functions))
+        for i, f := range iR.Functions </span><span class="cov8" title="38">{
+
+                config := pFunctionConfig{
+                        &amp;f,
+                        &amp;graph.Stats.Functions[i],
+                        graph.channels,
+                }
+                function, err := buildPFunction(config)
+                if err != nil </span><span class="cov0" title="0">{
+                        return Pipeline{}, err
+                }</span>
+
+                <span class="cov8" title="38">if function.To == nil </span><span class="cov6" title="12">{
+                        graph.tails = append(graph.tails, function)
+                }</span>
+
+                <span class="cov8" title="38">if function.From == nil </span><span class="cov6" title="13">{
+                        graph.roots = append(graph.roots, function)
+                }</span>
+
+                <span class="cov8" title="38">if function.Identifier == iR.OnStartup </span><span class="cov0" title="0">{
+                        graph.onStartup = function
+                }</span>
+
+                <span class="cov8" title="38">if function.Identifier == iR.OnTeardown </span><span class="cov0" title="0">{
+                        graph.onTeardown = function
+                }</span>
+
+                <span class="cov8" title="38">graph.functions[i] = function</span>
+        }
+
+        <span class="cov6" title="13">graph.flags.interactableCreated = false
+
+        return graph, nil</span>
+}
+
+////////////////////////////////////////////////////////////////////////
+//                                                Pipeline functions
+////////////////////////////////////////////////////////////////////////
+//
+//        Pipeline
+//                ∟ .Run( ... )
+//                ∟ .Test( data, ... )
+//                ∟ .TestAs( channel_name, data, ... )
+//
+////////////////////////////////////////////////////////////////////////
+
+func (pipeline Pipeline) createInteractable() Interactable <span class="cov5" title="11">{
+
+        runtime := newPipelineRuntime(pipeline)
+        interactable := Interactable{
+                Id:       pDefaultId,
+                Pipeline: pipeline.identifier,
+                pipeline: pipeline,
+                runtime:  runtime,
+        }
+
+        pipeline.flags.interactableCreated = true
+        return interactable
+}</span>
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  repository.go
+package ScalingFunctions
+
+import (
+        "errors"
+        "sync"
+)
+
+const defaultModuleVersion = "v0.0.1"
+
+var FunctionInModuleExistsErr = errors.New("module already has a function with this name")
+
+type Module struct {
+        Name      string
+        Version   string
+        functions map[string]F
+        mutex     sync.RWMutex
+}
+
+func (module *Module) LinkFunction(name string, value any) error <span class="cov10" title="14">{
+
+        module.mutex.Lock()
+        defer module.mutex.Unlock()
+
+        if _, found := module.functions[name]; found </span><span class="cov1" title="1">{
+                return FunctionInModuleExistsErr
+        }</span> else<span class="cov9" title="13"> {
+                module.functions[name] = F{Id: name, Value: value}
+        }</span>
+
+        <span class="cov9" title="13">return nil</span>
+}
+
+func (module *Module) Map(mappings map[string]any) error <span class="cov3" title="2">{
+
+        for name, value := range mappings </span><span class="cov7" title="6">{
+                if err := module.LinkFunction(name, value); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+        }
+        <span class="cov3" title="2">return nil</span>
+}
+
+func (module *Module) GetIR() *ModuleIR <span class="cov1" title="1">{
+
+        ir := new(ModuleIR)
+        ir.Identifier = module.Name
+        ir.Version = module.Version
+
+        numOfFunctions := len(module.functions)
+        ir.Functions = make([]FunctionIR, numOfFunctions)
+
+        idx := 0
+        for _, function := range module.functions </span><span class="cov3" title="2">{
+                ir.Functions[idx] = function.GetIR()
+                idx++
+        }</span>
+
+        <span class="cov1" title="1">return ir</span>
+}
+
+type Repository struct {
+        modules map[string]*Module
+        mutex   sync.RWMutex
+}
+
+func NewRepository() *Repository <span class="cov8" title="10">{
+
+        repository := new(Repository)
+        repository.modules = make(map[string]*Module)
+        return repository
+}</span>
+
+// Module
+// Find or create a new module to encapsulate clusters within. A module can be
+// described as a set of clusters that relate in terms of functionality.
+func (r *Repository) Module(name string) *Module <span class="cov8" title="9">{
+
+        r.mutex.Lock()
+        defer r.mutex.Unlock()
+
+        if _, found := r.modules[name]; !found </span><span class="cov8" title="9">{
+
+                mod := new(Module)
+                mod.Name = name
+                mod.Version = defaultModuleVersion
+                mod.functions = make(map[string]F)
+
+                r.modules[name] = mod
+        }</span>
+
+        <span class="cov8" title="9">return r.modules[name]</span>
+}
+
+// GetModules
+// Find the modules registered to the Repository.
+func (r *Repository) GetModules() (modules []*Module) <span class="cov1" title="1">{
+
+        modules = make([]*Module, len(r.modules))
+
+        idx := 0
+        for _, m := range r.modules </span><span class="cov3" title="2">{
+                modules[idx] = m
+                idx++
+        }</span>
+
+        <span class="cov1" title="1">return modules</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  runtime.go
+package ScalingFunctions
+
+import (
+        "errors"
+        "fmt"
+        "log"
+        "reflect"
+        "sync"
+        "time"
+
+        "github.com/GabeCordo/ScalingFunctions/internal/flags"
+)
+
+////////////////////////////////////////////////////////////////////////////////
+////                                                        Constants                                                                        ////
+////////////////////////////////////////////////////////////////////////////////
+
+const (
+        defaultMonitorRefreshDuration = 100
+)
+
+////////////////////////////////////////////////////////////////////////////////
+////                                                                Errors                                                                        ////
+////////////////////////////////////////////////////////////////////////////////
+
+var FunctionHasZeroStartWith = errors.New("pFunction cannot have a StartWith config of zero")
+
+////////////////////////////////////////////////////////////////////////////////
+////                                                                Types                                                                        ////
+////////////////////////////////////////////////////////////////////////////////
+
+// RunStatus
+// represents the current cStatus of the pipeline.
+type RunStatus string
+
+const (
+        UnTouched    RunStatus = "untouched"
+        Starting               = "starting"
+        Active                 = "active"
+        Provisioning           = "provisioning"
+        Failed                 = "failed"
+        Stopping               = "stopping"
+        Terminated             = "terminated"
+        Unknown                = "-"
+)
+
+func (status RunStatus) ToString() string <span class="cov0" title="0">{
+        switch status </span>{
+        case UnTouched:<span class="cov0" title="0">
+                return "UnTouched"</span>
+        case Starting:<span class="cov0" title="0">
+                return "Setup"</span>
+        case Active:<span class="cov0" title="0">
+                return "Active"</span>
+        case Provisioning:<span class="cov0" title="0">
+                return "Provisioning"</span>
+        case Failed:<span class="cov0" title="0">
+                return "Failed"</span>
+        case Terminated:<span class="cov0" title="0">
+                return "Terminated"</span>
+        default:<span class="cov0" title="0">
+                return "None"</span>
+        }
+}
+
+// runEvent
+// represents an event that can be pushed to the pipeline.
+type runEvent uint8
+
+const (
+        Startup runEvent = iota
+        Ready
+        StartProvision
+        EndProvision
+        Error
+        Suspend
+        TearedDown
+        StartReport
+        EndReport
+)
+
+// functionTerminationCause
+// represents the reason function execution was stopped.
+type functionTerminationCause uint8
+
+const (
+        Complete functionTerminationCause = iota
+        Forced
+)
+
+////////////////////////////////////////////////////////////////////////////////
+////                                                   pipelineRuntime                                                                ////
+////////////////////////////////////////////////////////////////////////////////
+
+// pipelineRuntime
+// is a container that holds all values used by a running instance of a Pipeline.
+type pipelineRuntime struct {
+        Id     uint64    `json:"id"`     // a unique identifier for the pipeline instance.
+        Status RunStatus `json:"status"` // the cStatus of the pipeline
+
+        Pipeline Pipeline // each pipeline has zero to many pipelineRuntime instances
+
+        injectables      []reflect.Value
+        numOfInjectables int
+
+        testing       bool
+        testingReport TestReport
+
+        waitGroup struct {
+                startup sync.WaitGroup // completes after the startup procedure has completed
+        }
+
+        mutex struct {
+                global         sync.RWMutex // ensures that the cStatus machine is treated as a critical section
+                threadCreation sync.Mutex   // ensure that thread creations is treated as a critical section
+        }
+}
+
+// newPipelineRuntime
+// builds a pipelineRuntime
+func newPipelineRuntime(pipeline Pipeline) *pipelineRuntime <span class="cov3" title="11">{
+        supervisor := new(pipelineRuntime)
+
+        /**
+         * Note: we may wish to dynamically modify the threshold and growth-factor rates
+         *       used by the managed channels to vary how provisioning of new transform and
+         *       load goroutines are created. This allows us to create an autonomous system
+         *       that "self improves" if the output of the monitor is looped back
+         */
+
+        supervisor.Status = UnTouched
+
+        supervisor.Pipeline = pipeline
+
+        supervisor.testing = false
+
+        supervisor.numOfInjectables = len(supervisor.injectables)
+        supervisor.waitGroup.startup.Add(1)
+
+        return supervisor
+}</span>
+
+func (instance *pipelineRuntime) injectDependencies(injectables ...any) <span class="cov3" title="10">{
+
+        instance.injectables = make([]reflect.Value, len(injectables))
+        for idx, injectable := range injectables </span><span class="cov0" title="0">{
+                instance.injectables[idx] = reflect.ValueOf(injectable)
+        }</span>
+}
+
+func (instance *pipelineRuntime) isForTesting() <span class="cov0" title="0">{
+        instance.testing = true
+}</span>
+
+func (instance *pipelineRuntime) startup() error <span class="cov3" title="10">{
+
+        // the startup function may optionally be provided by the developer.
+        if instance.Pipeline.onStartup != nil </span><span class="cov0" title="0">{
+                if flags.DEBUG </span><span class="cov0" title="0">{
+                        log.Println("Running onStartup function")
+                }</span>
+
+                <span class="cov0" title="0">f := reflect.ValueOf(instance.Pipeline.onStartup.Value)
+                f.Call(instance.injectables)</span>
+        }
+
+        // provision each function in the pipeline that is required before
+        // data can begin flowing between functions in the pipeline.
+        <span class="cov3" title="10">for _, function := range instance.Pipeline.functions </span><span class="cov5" title="31">{
+
+                // If there exists a pFunction.Config.StartWith config that is 0,
+                // it is possible for the pipeline to deadlock. One of the functions
+                // in the pipeline will not be created breaking the chain of execution.
+                //
+                // (Example)
+                // Function:                A        -&gt;        B        -&gt;        C        -&gt;         D
+                // StartWith:                1                0                1                1
+                //
+                // pFunction 'B' has a StartWith 0 so the startup() function will not
+                // start any listener for the 1st channel, or producer for the 2nd channel.
+                //
+                // pFunction 'A' will be pushing to a channel that isn't read.
+                // pFunction 'C' and 'D' will be not receive data wasting resources.
+                if function.Config.StartWith == 0 </span><span class="cov0" title="0">{
+                        return FunctionHasZeroStartWith
+                }</span>
+
+                <span class="cov5" title="31">for j := uint16(0); (j &lt; function.Config.StartWith) &amp;&amp; (function.Config.Maximum == 0 || j &lt; function.Config.Maximum); j++ </span><span class="cov5" title="31">{
+                        instance.provision(function)
+
+                        // note: these statistics are not run in parallel
+                        //                 ~ there is not risk of a data race
+                        function.Stats.Active++
+                        function.Stats.Provisions++
+                }</span>
+        }
+
+        <span class="cov3" title="10">return nil</span>
+}
+
+// runtime
+// every N seconds we should check if the ETChannel or TLChannel is congested
+// and requires us to provision additional nodes.
+func (instance *pipelineRuntime) runtime() <span class="cov3" title="10">{
+
+        for </span><span class="cov5" title="30">{
+                // if the pipeline has been terminated we should end the
+                // runtime loop of checking the channels and scaling functions
+                if instance.Status == Terminated </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov5" title="30">numOfClosedChannels := 0
+                for _, chn := range instance.Pipeline.channels </span><span class="cov6" title="72">{
+
+                        channelState := chn.Value.GetState()
+
+                        if (instance.Status == Stopping) &amp;&amp; chn.Value.Accepting() </span><span class="cov0" title="0">{
+                                chn.Value.StopPushes()
+                        }</span>
+
+                        <span class="cov6" title="72">if channelState == Congested </span><span class="cov0" title="0">{
+
+                                chn.Stats.Breaches++
+
+                                for _, f := range chn.Receiver </span><span class="cov0" title="0">{
+                                        n := chn.Config.GrowthFactor
+                                        for (n &gt; 0) &amp;&amp; (f.Stats.Active &lt; f.Config.Maximum) </span><span class="cov0" title="0">{
+                                                f.Mutex.Lock()
+                                                f.Stats.Provisions++
+                                                f.Stats.Active++
+                                                f.Mutex.Unlock()
+                                                instance.provision(f)
+                                                n--
+                                        }</span>
+                                }
+                        } else<span class="cov6" title="72"> if (channelState == Underutilized) || (channelState == Idle) </span><span class="cov4" title="21">{
+
+                                for _, f := range chn.Receiver </span><span class="cov4" title="21">{
+
+                                        n := chn.Config.GrowthFactor
+                                        for n &gt; 0 </span><span class="cov4" title="21">{
+                                                f.Mutex.RLock()
+                                                // never remove all transform nodes otherwise we risk the
+                                                // ET channel having no consumers
+                                                if f.Stats.Active &lt;= 1 </span><span class="cov4" title="21">{
+                                                        f.Mutex.RUnlock()
+                                                        break</span>
+                                                }
+                                                <span class="cov0" title="0">f.Mutex.RUnlock()
+                                                f.Stats.Active--
+                                                instance.remove(f)
+                                                n--</span>
+                                        }
+                                }
+                        } else<span class="cov5" title="51"> if channelState == Closed </span><span class="cov4" title="21">{
+                                numOfClosedChannels++
+                        }</span>
+                }
+
+                // when all channels have been closed there is no reason
+                // to keep the execution loop running.
+                <span class="cov5" title="30">if numOfClosedChannels == len(instance.Pipeline.channels) </span><span class="cov3" title="10">{
+                        break</span>
+                }
+
+                // check if the channel is congested after defaultMonitorRefreshDuration seconds
+                <span class="cov4" title="20">time.Sleep(defaultMonitorRefreshDuration * time.Millisecond)</span>
+        }
+}
+
+func (instance *pipelineRuntime) teardown() <span class="cov3" title="10">{
+
+        // TODO : add a guard in case this value is not a function
+        if instance.Pipeline.onTeardown != nil </span><span class="cov0" title="0">{
+                f := reflect.ValueOf(instance.Pipeline.onTeardown.Value)
+                f.Call(instance.injectables)
+        }</span>
+
+        <span class="cov3" title="10">instance.event(Suspend)</span>
+}
+
+func (instance *pipelineRuntime) start() error <span class="cov3" title="10">{
+        instance.event(Startup)
+        defer instance.event(TearedDown)
+
+        if flags.DEBUG </span><span class="cov0" title="0">{
+                log.Printf("Starting instance with id: %d", instance.Id)
+        }</span>
+
+        <span class="cov3" title="10">var err error = nil
+
+        defer func() </span><span class="cov3" title="10">{
+                // has the user defined function crashed during runtime?
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        // yes =&gt; return a response that identifies that the cluster crashed
+                        err = errors.New("crashed during runtime") // TODO : make into standard error
+                }</span>
+        }()
+
+        //// start creating the default frontend goroutines
+
+        <span class="cov3" title="10">err = instance.startup()
+        if err != nil </span><span class="cov0" title="0">{
+                instance.waitGroup.startup.Done()
+                return err
+        }</span>
+        <span class="cov3" title="10">instance.waitGroup.startup.Done() // allow actions that need to wait for startup to begin
+
+        //// end creating the default frontend goroutines
+
+        instance.runtime()
+
+        instance.teardown()
+
+        return err</span>
+}
+
+////////////////////////////////////////////////////////////////////////////////
+////                                        pipelineRuntime cStatus Machine                                                ////
+////////////////////////////////////////////////////////////////////////////////
+
+func (instance *pipelineRuntime) event(event runEvent) bool <span class="cov6" title="94">{
+        instance.mutex.global.Lock()
+        defer instance.mutex.global.Unlock()
+
+        if instance.Status == UnTouched </span><span class="cov3" title="10">{
+                if event == Startup </span><span class="cov3" title="10">{
+                        instance.Status = Active
+                }</span> else<span class="cov0" title="0"> if (event == Suspend) || (event == TearedDown) </span><span class="cov0" title="0">{
+                        instance.Status = Stopping
+                }</span> else<span class="cov0" title="0"> {
+                        return false
+                }</span>
+        } else<span class="cov6" title="84"> if instance.Status == Active </span><span class="cov5" title="41">{
+                if event == StartProvision </span><span class="cov5" title="31">{
+                        instance.Status = Provisioning
+                }</span> else<span class="cov3" title="10"> if event == Error </span><span class="cov0" title="0">{
+                        instance.Status = Failed
+                }</span> else<span class="cov3" title="10"> if event == Suspend </span><span class="cov3" title="10">{
+                        instance.Status = Stopping
+                }</span> else<span class="cov0" title="0"> if event == TearedDown </span><span class="cov0" title="0">{
+                        instance.Status = Terminated
+                }</span> else<span class="cov0" title="0"> {
+                        return false
+                }</span>
+        } else<span class="cov5" title="43"> if instance.Status == Provisioning </span><span class="cov5" title="31">{
+                if event == EndProvision </span><span class="cov5" title="31">{
+                        instance.Status = Active
+                }</span> else<span class="cov0" title="0"> if event == Error </span><span class="cov0" title="0">{
+                        instance.Status = Failed
+                }</span> else<span class="cov0" title="0"> if event == Suspend </span><span class="cov0" title="0">{
+                        instance.Status = Stopping
+                }</span> else<span class="cov0" title="0"> {
+                        return false
+                }</span>
+        } else<span class="cov3" title="12"> if instance.Status == Stopping </span><span class="cov3" title="12">{
+                if event == TearedDown </span><span class="cov3" title="10">{
+                        instance.Status = Terminated
+                }</span> else<span class="cov1" title="2"> {
+                        return false
+                }</span>
+        } else<span class="cov0" title="0"> if (instance.Status == Failed) || (instance.Status == Terminated) </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        <span class="cov6" title="92">return true</span> // represents a boolean ~ hasStateChanged?
+}
+
+func (instance *pipelineRuntime) IsAlive() bool <span class="cov7" title="202">{
+
+        instance.mutex.global.RLock()
+        defer instance.mutex.global.RUnlock()
+
+        return (instance.Status != Failed) &amp;&amp; (instance.Status != Terminated)
+}</span>
+
+////////////////////////////////////////////////////////////////////////////////
+////                                                   pipelineRuntime                                                                ////
+////////////////////////////////////////////////////////////////////////////////
+
+func (instance *pipelineRuntime) extractWrapper(function *pFunction, channel *managedChannel) &lt;-chan struct{} <span class="cov3" title="10">{
+        done := make(chan struct{})
+
+        // the function always finishes till completion unless a direct shutdown is called on the server
+        // which stops data collection from some source
+        go func() </span><span class="cov3" title="10">{
+                defer func() </span><span class="cov3" title="10">{
+                        done &lt;- struct{}{}
+                        close(done)
+                }</span>()
+
+                <span class="cov3" title="10">numberInjectables := len(instance.injectables)
+                arguments := make([]reflect.Value, numberInjectables)
+                copy(arguments, instance.injectables)
+
+                // the first parameter of an extract function that is not an injectable
+                // shall be a channel that the function can push extracted data to
+                if (function.Reflected.Type.NumIn() - numberInjectables) &gt; 0 </span><span class="cov3" title="10">{
+
+                        // do we expect to pass a pipe?
+                        channelType := function.Reflected.Type.In(numberInjectables)
+
+                        if channelType.Kind() == reflect.Chan </span><span class="cov3" title="10">{
+                                c := reflect.MakeChan(channelType, numberInjectables)
+                                arguments = append(arguments, c)
+                        }</span>
+                }
+
+                <span class="cov3" title="10">go function.Reflected.Value.Call(arguments)
+
+                // as the extract function runs asynchronously and sends data to the
+                // channel, receive data from the channel and push data to the next
+                // function in the Pipeline sequence.
+                if (function.Reflected.Type.NumIn() - numberInjectables) &gt; 0 </span><span class="cov3" title="10">{
+                        ch := arguments[numberInjectables]
+                        for </span><span class="cov9" title="1080">{
+                                value, ok := ch.Recv()
+                                if ok </span><span class="cov9" title="1072">{
+                                        if !channel.Push([]reflect.Value{value}) </span><span class="cov1" title="2">{
+                                                // Channel stopped accepting pushes. Drain ch in background so
+                                                // the producer function doesn't deadlock sending to ch.
+                                                go func(c reflect.Value) </span><span class="cov1" title="2">{
+                                                        for </span><span class="cov6" title="147">{
+                                                                _, ok := c.Recv()
+                                                                if !ok </span><span class="cov0" title="0">{
+                                                                        break</span>
+                                                                }
+                                                        }
+                                                }(ch)
+                                                <span class="cov1" title="2">break</span>
+                                        }
+                                } else<span class="cov3" title="8"> {
+                                        break</span>
+                                }
+                        }
+                }
+        }()
+        <span class="cov3" title="10">return done</span>
+}
+
+func (instance *pipelineRuntime) extractShutdownWrapper() &lt;-chan struct{} <span class="cov3" title="10">{
+        done := make(chan struct{})
+
+        // we need to create a separate goroutine otherwise it will block the current
+        // thread from re-evaluating the select statement wherever the extractShutdownWrapper is called
+        go func() </span><span class="cov3" title="10">{
+                defer close(done)
+                for </span><span class="cov7" title="182">{
+                        // the IsAlive clause ensures that once a runner is dead, we will not leak memory
+                        // with a forever-running goroutine
+                        instance.mutex.global.RLock()
+                        stopping := (instance.Status == Stopping) || (!instance.IsAlive())
+                        instance.mutex.global.RUnlock()
+
+                        if stopping </span><span class="cov3" title="9">{
+                                break</span>
+                        }
+                        <span class="cov7" title="173">time.Sleep(10 * time.Millisecond)</span>
+                }
+        }()
+
+        <span class="cov3" title="10">return done</span>
+}
+
+var errorInterface = reflect.TypeOf((*error)(nil)).Elem()
+
+// call
+// a channelDataWrapper function that checks the returned values from a function call for
+// error values. if the function returns an error that is non-nil we will set
+// the returned boolean flag to true indicating something may have gone wrong
+// inside the function call.
+func (instance *pipelineRuntime) call(function *pFunction, ins []reflect.Value) ([]reflect.Value, bool) <span class="cov9" title="2070">{
+
+        drop := false
+
+        // append the values given to the function on-top of the injectables that need to
+        // be passed to every step in the Pipeline
+        arguments := append(instance.injectables, ins...)
+        results := function.Reflected.Value.Call(arguments)
+
+        // TODO : the number of results returned by a function can be pre-computed
+        numResults := len(results)
+
+        // a common pattern in golang is to return (value, error) where error can be used
+        // to identify that the function was not able to run to completion.
+        //
+        // the Pipeline supports a similar method of identifying that the function failed
+        // to run successfully to completion. when the function returns an error value
+        // (that must be the last value returned) the Pipeline will check whether the
+        // error is nil or not to determine whether the resultant data should be used.
+        //
+        // error is nil -&gt; keep sending the resultant data along the Pipeline
+        // error -&gt; do NOT pass the data along the Pipeline (aka. drop the data)
+        if numResults &gt; 0 </span><span class="cov9" title="2070">{
+
+                lastResult := results[numResults-1]
+
+                isError := lastResult.Type().Implements(errorInterface)
+
+                if isError </span><span class="cov9" title="2000">{
+                        isNil := lastResult.IsNil()
+
+                        if !isNil </span><span class="cov0" title="0">{
+                                // the framework shall be responsible for displaying errors sent
+                                // by the Pipeline to avoid requiring the developer to handle and return
+                                // the error which is considered an anti-pattern
+                                log.Println(lastResult.Elem())
+
+                                if instance.testing </span><span class="cov0" title="0">{
+                                        instance.testingReport.Success = false
+                                        instance.testingReport.Step = function.Identifier
+                                        instance.testingReport.Cause = lastResult.Interface().(error)
+                                }</span>
+                                <span class="cov0" title="0">drop = true</span>
+                        }
+
+                        // never pass an error along the Pipeline
+                        <span class="cov9" title="2000">results = results[:numResults-1]</span>
+                }
+        }
+
+        <span class="cov9" title="2070">return results, drop</span>
+}
+
+// provision
+// creates a new running instance of a pFunction.
+func (instance *pipelineRuntime) provision(function *pFunction) <span class="cov5" title="31">{
+        instance.event(StartProvision)
+        defer instance.event(EndProvision)
+
+        // the runner must provision new threads one at a time.
+        // note: avoid the possibility of &gt;1 thread modifying the wait-group at a time
+        instance.mutex.threadCreation.Lock()
+        defer instance.mutex.threadCreation.Unlock()
+
+        // a new function is provisioned
+        // we should inform the wait group that the runner isn't finished until the wg is done
+        //instance.waitGroup.Add(1)
+
+        go func(supervisor *pipelineRuntime, function *pFunction) </span><span class="cov5" title="31">{
+
+                if (function.From == nil) &amp;&amp; (function.To != nil) </span><span class="cov3" title="10">{
+                        // the function is a STARTING NODE of the Pipeline if no data is being received
+
+                        defer func() </span><span class="cov3" title="10">{
+                                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                                        out := fmt.Sprintf("cluster.Extract function raised error: %v", r)
+                                        err := errors.New(out)
+                                        if instance.testing </span><span class="cov0" title="0">{
+                                                instance.testingReport.Success = false
+                                                instance.testingReport.Step = function.Identifier
+                                                instance.testingReport.Cause = err
+                                        }</span>
+                                        <span class="cov0" title="0">log.Println(err)
+                                        function.To.Value.ProducerDone()</span>
+                                        //supervisor.waitGroup.Done()
+                                }
+                        }()
+
+                        // support passing values to the Pipeline manually
+                        // todo : add more description
+                        <span class="cov3" title="10">if instance.testing </span><span class="cov0" title="0">{
+                                return
+                        }</span>
+
+                        <span class="cov3" title="10">function.To.Value.AddProducer()
+
+                        if flags.DEBUG </span><span class="cov0" title="0">{
+                                log.Printf("creating new producer function %d\n", supervisor.Id)
+                        }</span>
+
+                        // TODO : reword
+                        // if the producer function has output, then don't worry about spawning a channelDataWrapper,
+                        // allow the function to return normally and send the data along the pipe
+
+                        <span class="cov3" title="10">if function.Reflected.Type.NumOut() &gt; 0 </span><span class="cov0" title="0">{
+
+                                output := function.Reflected.Value.Call(instance.injectables)
+                                function.To.Value.Push(output)
+
+                        }</span> else<span class="cov3" title="10"> {
+
+                                select </span>{
+                                case &lt;-supervisor.extractWrapper(function, function.To.Value):<span class="cov3" title="8">
+                                        break</span>
+                                case &lt;-supervisor.extractShutdownWrapper():<span class="cov1" title="2">
+                                        fmt.Println("shutdown caused extract to finish early")
+                                        break</span>
+                                }
+                        }
+
+                        <span class="cov3" title="10">function.Mutex.Lock()
+                        function.Stats.Active--
+                        function.Mutex.Unlock()
+
+                        // if the number of producers is 0, the ET channel will close that
+                        // allows the Transform goroutines to terminate once they have
+                        // completed processing all of their data
+                        function.To.Value.ProducerDone()</span>
+                } else<span class="cov4" title="21"> if (function.From != nil) &amp;&amp; (function.To == nil) </span><span class="cov3" title="10">{
+                        // the function is an ENDPOINT NODE of the Pipeline if no data is being sent
+
+                        quit := make(chan bool, 1)
+                        function.Mutex.Lock()
+                        function.Quit = append(function.Quit, quit)
+                        function.Mutex.Unlock()
+
+                        defer func() </span><span class="cov3" title="10">{
+                                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                                        out := fmt.Sprintf("cluster.Load function raised error: %v", r)
+                                        err := errors.New(out)
+                                        if instance.testing </span><span class="cov0" title="0">{
+                                                instance.testingReport.Success = false
+                                                instance.testingReport.Step = function.Identifier
+                                                instance.testingReport.Cause = err
+                                        }</span>
+                                        <span class="cov0" title="0">log.Println(err)</span>
+                                        //supervisor.waitGroup.Done()
+                                }
+                        }()
+
+                        <span class="cov3" title="10">if flags.DEBUG </span><span class="cov0" title="0">{
+                                log.Printf("creating new endpoint function %d\n", supervisor.Id)
+                        }</span>
+
+                        <span class="cov3" title="10">var queuedRequests reflect.Value
+                        if function.Config.WaitBefore </span><span class="cov0" title="0">{
+                                in := function.Reflected.Type.In(0)
+                                queuedRequests = reflect.MakeSlice(in, 0, 0)
+                        }</span>
+                        <span class="cov3" title="10">closeChan := false
+                        terminationCause := Complete
+
+                        for </span><span class="cov9" title="1080">{
+                                select </span>{
+                                case request := &lt;-function.From.Value.channel:<span class="cov9" title="1080">
+                                        </span><span class="cov9" title="1080">{
+                                                if request.IsInvalid() </span><span class="cov3" title="10">{
+                                                        closeChan = true
+                                                        break</span>
+                                                }
+
+                                                <span class="cov9" title="1070">function.From.Mutex.Lock()
+                                                function.From.Stats.Pulled++
+                                                function.From.Mutex.Unlock()
+
+                                                // associates a TimeOut to the data being removed from the channel and decrements
+                                                // the data counter for the current pipe
+                                                function.From.Value.DataPopped(request.In)
+
+                                                // what: the developer has an option to wait for all the data to be received by a
+                                                // channel before processing that data.
+                                                //
+                                                // why: we may need a bulk set of data before being able to do anything
+                                                if function.Config.WaitBefore </span><span class="cov0" title="0">{
+                                                        queuedRequests = reflect.Append(queuedRequests, request.Data[0])
+                                                }</span> else<span class="cov9" title="1070"> {
+                                                        arguments := append(instance.injectables, request.Data...)
+                                                        function.Reflected.Value.Call(arguments)
+                                                }</span>
+                                        }
+                                case &lt;-quit:<span class="cov0" title="0">
+                                        </span><span class="cov0" title="0">{
+                                                terminationCause = Forced
+                                                closeChan = true
+                                        }</span>
+                                }
+
+                                <span class="cov9" title="1080">if closeChan </span><span class="cov3" title="10">{
+
+                                        if terminationCause == Complete </span><span class="cov3" title="10">{
+                                                function.Mutex.Lock()
+                                                function.Stats.Active--
+                                                function.Mutex.Unlock()
+                                        }</span>
+
+                                        // if we were waiting for the channel to close before transforming the data,
+                                        // call the function now that the channel is closed
+                                        <span class="cov3" title="10">if function.Config.WaitBefore </span><span class="cov0" title="0">{
+                                                arguments := append(instance.injectables, queuedRequests)
+                                                function.Reflected.Value.Call(arguments)
+                                        }</span>
+
+                                        <span class="cov3" title="10">break</span>
+                                }
+                        }
+                } else<span class="cov3" title="11"> if (function.From != nil) &amp;&amp; (function.To != nil) </span><span class="cov3" title="11">{
+                        defer func() </span><span class="cov3" title="11">{
+                                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                                        out := fmt.Sprintf("cluster.Transform function raised error: %v", r)
+                                        err := errors.New(out)
+                                        if instance.testing </span><span class="cov0" title="0">{
+                                                instance.testingReport.Success = false
+                                                instance.testingReport.Step = function.Identifier
+                                                instance.testingReport.Cause = err
+                                        }</span>
+                                        <span class="cov0" title="0">log.Println(err)
+                                        function.To.Value.ProducerDone()</span>
+                                        //supervisor.waitGroup.Done()
+                                }
+                        }()
+
+                        <span class="cov3" title="11">quit := make(chan bool, 1)
+                        function.Mutex.Lock()
+                        function.Quit = append(function.Quit, quit)
+                        function.Mutex.Unlock()
+
+                        function.To.Value.AddProducer()
+
+                        if flags.DEBUG </span><span class="cov0" title="0">{
+                                log.Printf("creating new transformer function %d\n", supervisor.Id)
+                        }</span>
+
+                        <span class="cov3" title="11">var queuedRequests reflect.Value
+                        if function.Config.WaitBefore </span><span class="cov0" title="0">{
+                                in := function.Reflected.Type.In(0)
+                                queuedRequests = reflect.MakeSlice(in, 0, 0)
+                        }</span>
+                        <span class="cov3" title="11">closeChan := false
+                        terminationCause := Complete
+
+                        for </span><span class="cov10" title="2081">{
+                                select </span>{
+                                case request := &lt;-function.From.Value.channel:<span class="cov10" title="2081">
+                                        </span><span class="cov10" title="2081">{
+                                                // sometimes we are receiving bad data?
+                                                if request.IsInvalid() </span><span class="cov3" title="11">{
+                                                        closeChan = true
+                                                        break</span>
+                                                }
+
+                                                // associates a TimeOut to the data being removed from the channel and decrements
+                                                // the data counter for the current pipe
+                                                <span class="cov9" title="2070">function.From.Value.DataPopped(request.In)
+
+                                                function.From.Mutex.Lock()
+                                                function.From.Stats.Pulled++
+                                                function.From.Mutex.Unlock()
+
+                                                // what: the developer has an option to wait for all the data to be received by a
+                                                // channel before processing that data.
+                                                //
+                                                // why: we may need a bulk set of data before being able to do anything
+                                                if function.Config.WaitBefore </span><span class="cov0" title="0">{
+                                                        queuedRequests = reflect.Append(queuedRequests, request.Data[0])
+                                                }</span> else<span class="cov9" title="2070"> {
+                                                        results, drop := supervisor.call(function, request.Data)
+
+                                                        if !drop </span><span class="cov9" title="2070">{
+                                                                isSliceExplosion := false
+                                                                if len(results) &gt; 0 &amp;&amp; results[0].Kind() == reflect.Slice </span><span class="cov0" title="0">{
+                                                                        if len(function.To.Receiver) &gt; 0 </span><span class="cov0" title="0">{
+                                                                                nextFunction := function.To.Receiver[0]
+                                                                                nextFunctionReflection := nextFunction.Reflected.Type
+                                                                                if (nextFunctionReflection.NumIn() &gt; instance.numOfInjectables) &amp;&amp; (nextFunctionReflection.In(instance.numOfInjectables).Kind() != reflect.Slice) </span><span class="cov0" title="0">{
+                                                                                        isSliceExplosion = true
+                                                                                }</span>
+                                                                        }
+                                                                }
+
+                                                                <span class="cov9" title="2070">if isSliceExplosion </span><span class="cov0" title="0">{
+                                                                        sliceLen := results[0].Len()
+                                                                        function.To.Mutex.Lock()
+                                                                        function.To.Stats.Pushed += uint64(sliceLen)
+                                                                        function.To.Mutex.Unlock()
+
+                                                                        for i := 0; i &lt; sliceLen; i++ </span><span class="cov0" title="0">{
+                                                                                function.To.Value.Push([]reflect.Value{results[0].Index(i)})
+                                                                        }</span>
+                                                                } else<span class="cov9" title="2070"> {
+                                                                        function.To.Mutex.Lock()
+                                                                        function.To.Stats.Pushed++
+                                                                        function.To.Mutex.Unlock()
+
+                                                                        function.To.Value.Push(results)
+                                                                }</span>
+                                                        } else<span class="cov0" title="0"> {
+                                                                function.From.Mutex.Lock()
+                                                                function.From.Stats.Dropped++
+                                                                function.From.Mutex.Unlock()
+                                                        }</span>
+                                                }
+                                        }
+                                case &lt;-quit:<span class="cov0" title="0">
+                                        </span><span class="cov0" title="0">{
+                                                terminationCause = Forced
+                                                closeChan = true
+                                        }</span>
+                                }
+
+                                <span class="cov10" title="2081">if closeChan </span><span class="cov3" title="11">{
+
+                                        if terminationCause == Complete </span><span class="cov3" title="11">{
+                                                function.Mutex.Lock()
+                                                function.Stats.Active--
+                                                function.Mutex.Unlock()
+                                        }</span>
+
+                                        // if we were waiting for the channel to close before transforming the data,
+                                        // call the function now that the channel is closed
+                                        <span class="cov3" title="11">if function.Config.WaitBefore </span><span class="cov0" title="0">{
+                                                results, drop := supervisor.call(function, []reflect.Value{queuedRequests})
+
+                                                if !drop </span><span class="cov0" title="0">{
+                                                        function.To.Mutex.Lock()
+                                                        function.To.Stats.Pushed++
+                                                        function.To.Mutex.Unlock()
+
+                                                        function.To.Value.Push(results)
+                                                }</span> else<span class="cov0" title="0"> {
+                                                        function.From.Mutex.Lock()
+                                                        function.From.Stats.Dropped++
+                                                        function.From.Mutex.Unlock()
+                                                }</span>
+                                        }
+                                        <span class="cov3" title="11">break</span>
+                                }
+                        }
+
+                        // if the number of producers is 0, the TL channel will close that
+                        // allows the Load goroutines to terminate once they have
+                        // completed processing all of their data
+                        <span class="cov3" title="11">function.To.Value.ProducerDone()</span>
+                } else<span class="cov0" title="0"> {
+                        panic("function is neither a producer or receiver of data")</span>
+                }
+
+                // notify the wait group a process has completed ~ if all are finished we close the monitor
+                //supervisor.waitGroup.Done()
+        }(instance, function)
+}
+
+// remove
+// terminates a running instance of type pFunction.
+func (instance *pipelineRuntime) remove(function *pFunction) <span class="cov0" title="0">{
+
+        function.Mutex.Lock()
+        if function.Stats.Active &lt;= 0 </span><span class="cov0" title="0">{
+                function.Mutex.Unlock()
+                panic("attempting to quit when no functions are running")</span>
+        }
+
+        <span class="cov0" title="0">quit := function.Quit[0]
+        function.Quit = function.Quit[1:]
+        function.Mutex.Unlock()
+
+        quit &lt;- true</span>
+}
+
+////////////////////////////////////////////////////////////////////////////////
+////                        functions to send data to a pipelineRuntime                                        ////
+////////////////////////////////////////////////////////////////////////////////
+
+func (instance *pipelineRuntime) send(data any, functionId ...string) <span class="cov0" title="0">{
+
+        specifiedFunction := len(functionId) &gt; 0
+
+        // the developer needs to specify which root they want to mimic
+        // when the Pipeline's topology is more complex than a linear line
+        if !specifiedFunction &amp;&amp; (len(instance.Pipeline.roots) &gt; 1) </span><span class="cov0" title="0">{
+                panic("testing non-linear pipelines requires specifying which generator function is being stubbed")</span>
+        }
+
+        <span class="cov0" title="0">instance.waitGroup.startup.Wait()
+        instance.testingReport.Success = true
+
+        isDataSent := false
+        for _, f := range instance.Pipeline.roots </span><span class="cov0" title="0">{
+
+                // do not push data to the Pipeline when the function identifier is
+                // specified and does not match.
+                if specifiedFunction &amp;&amp; (f.Identifier != functionId[0]) </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">f.To.Value.AddProducer()
+                f.To.Value.Push([]reflect.Value{reflect.ValueOf(data)})
+
+                isDataSent = true</span>
+        }
+
+        <span class="cov0" title="0">if !isDataSent </span><span class="cov0" title="0">{
+                panic("attempt to test the Pipeline failed, could not find a Pipeline to push data to")</span>
+        }
+}
+
+func (instance *pipelineRuntime) close() <span class="cov1" title="2">{
+
+        instance.waitGroup.startup.Wait()
+
+        if instance.testing </span><span class="cov0" title="0">{
+                var err error
+                for _, f := range instance.Pipeline.roots </span><span class="cov0" title="0">{
+                        f.Mutex.Lock()
+                        f.Stats.Active--
+                        f.Mutex.Unlock()
+
+                        err = f.To.Value.ProducerDone()
+                        if err != nil </span><span class="cov0" title="0">{
+                                fmt.Println(err)
+                        }</span>
+                }
+        }
+
+        <span class="cov1" title="2">instance.event(Suspend)
+
+        for instance.IsAlive() </span><span class="cov4" title="20">{
+                time.Sleep(10 * time.Millisecond)
+        }</span>
+}
+
+func (instance *pipelineRuntime) print() <span class="cov0" title="0">{
+        fmt.Printf("Id: %d\n", instance.Id)
+}</span>
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  statistics.go
+package ScalingFunctions
+
+import (
+        "fmt"
+        "time"
+)
+
+type TimingStatistics struct {
+        MinTimeBeforePop time.Duration `json:"min_time_before_pop_ns"`
+        MaxTimeBeforePop time.Duration `json:"max_time_before_pop_ns"`
+        AverageTime      time.Duration `json:"average_time_ns"`
+        MedianTime       time.Duration `json:"median_time_ns"`
+}
+
+type FunctionStatistic struct {
+        Active     uint16 `json:"active"`
+        Provisions uint64 `json:"provisions"`
+}
+
+type PipeStatistic struct {
+        Pushed   uint64
+        Pulled   uint64           `json:"processed"`
+        Dropped  uint64           `json:"dropped"`
+        Breaches uint64           `json:"breaches"`
+        Timing   TimingStatistics `json:"timing"`
+}
+
+type Statistics struct {
+        NumOfFunctions uint16              `json:"num_of_functions"`
+        Functions      []FunctionStatistic `json:"steps"`
+        NumOfChannels  uint16              `json:"num_of_channels"`
+        Pipes          []PipeStatistic     `json:"channels"`
+}
+
+// Print
+// is a debug function used to view a snapshot of the Pipeline at an instance in time.
+func (s Statistics) Print() <span class="cov1" title="1">{
+
+        for idx, function := range s.Functions </span><span class="cov4" title="3">{
+                fmt.Printf("FunctionIR (%d):\n", idx)
+                fmt.Printf("\tActive: %d\n\tProvisioned: %d\n", function.Active, function.Provisions)
+        }</span>
+
+        <span class="cov1" title="1">for idx, pipe := range s.Pipes </span><span class="cov3" title="2">{
+                fmt.Printf("Channel (%d):\n", idx)
+                fmt.Printf("\tPushed: %d\n\tPulled: %d\n\tDropped: %d\n\tBreaches: %d\n", pipe.Pushed, pipe.Pulled, pipe.Dropped, pipe.Breaches)
+                fmt.Println("\tTiming:")
+                fmt.Printf("\t\tMin:%v\n\t\tMax:%v\n", pipe.Timing.MinTimeBeforePop, pipe.Timing.MaxTimeBeforePop)
+        }</span>
+}
+
+// NewStatistics
+// is a constructor function to initialize memory for storing statistics.
+func NewStatistics(numOfFunctions, numOfPipes uint16) *Statistics <span class="cov10" title="14">{
+        stats := new(Statistics)
+
+        stats.NumOfFunctions = numOfFunctions
+        stats.Functions = make([]FunctionStatistic, numOfFunctions)
+
+        stats.NumOfChannels = numOfPipes
+        stats.Pipes = make([]PipeStatistic, numOfPipes)
+
+        return stats
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
