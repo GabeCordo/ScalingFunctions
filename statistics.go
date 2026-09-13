@@ -60,10 +60,10 @@ func (s Statistics) Print() {
 func NewStatistics(numOfFunctions, numOfPipes uint16) *Statistics {
 	stats := new(Statistics)
 
-	stats.NumOfFunctions = 0
+	stats.NumOfFunctions = numOfFunctions
 	stats.Functions = make([]FunctionStatistic, numOfFunctions)
 
-	stats.NumOfChannels = 0
+	stats.NumOfChannels = numOfPipes
 	stats.Pipes = make([]PipeStatistic, numOfPipes)
 
 	return stats

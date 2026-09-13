@@ -180,12 +180,15 @@ func (mc *managedChannel) Push(data []reflect.Value) bool {
 	}
 
 	// don't push to the channel if it is supposed to be closed
-	mc.cMutexes.state.Lock()
-	if mc.cFlags.stopNewPushes {
+	mc.cMutexes.state.RLock()
+	stop := mc.cFlags.stopNewPushes
+	mc.cMutexes.state.RUnlock()
+
+	if stop {
 		return false
 	}
+
 	mc.channel <- channelDataWrapper{In: currentTime, Data: data}
-	mc.cMutexes.state.Unlock()
 
 	return true
 }

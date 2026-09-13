@@ -191,7 +191,7 @@ func (instance *pipelineRuntime) startup() error {
 			return FunctionHasZeroStartWith
 		}
 
-		for j := uint16(0); (j < function.Config.StartWith) && (j < function.Config.Maximum); j++ {
+		for j := uint16(0); (j < function.Config.StartWith) && (function.Config.Maximum == 0 || j < function.Config.Maximum); j++ {
 			instance.provision(function)
 
 			// note: these statistics are not run in parallel
@@ -278,7 +278,7 @@ func (instance *pipelineRuntime) runtime() {
 func (instance *pipelineRuntime) teardown() {
 
 	// TODO : add a guard in case this value is not a function
-	if instance.Pipeline.onStartup != nil {
+	if instance.Pipeline.onTeardown != nil {
 		f := reflect.ValueOf(instance.Pipeline.onTeardown.Value)
 		f.Call(instance.injectables)
 	}
@@ -419,11 +419,23 @@ func (instance *pipelineRuntime) extractWrapper(function *pFunction, channel *ma
 		// channel, receive data from the channel and push data to the next
 		// function in the Pipeline sequence.
 		if (function.Reflected.Type.NumIn() - numberInjectables) > 0 {
-
+			ch := arguments[numberInjectables]
 			for {
-				value, ok := arguments[numberInjectables].Recv()
+				value, ok := ch.Recv()
 				if ok {
-					channel.Push([]reflect.Value{value})
+					if !channel.Push([]reflect.Value{value}) {
+						// Channel stopped accepting pushes. Drain ch in background so
+						// the producer function doesn't deadlock sending to ch.
+						go func(c reflect.Value) {
+							for {
+								_, ok := c.Recv()
+								if !ok {
+									break
+								}
+							}
+						}(ch)
+						break
+					}
 				} else {
 					break
 				}
@@ -444,11 +456,13 @@ func (instance *pipelineRuntime) extractShutdownWrapper() <-chan struct{} {
 			// the IsAlive clause ensures that once a runner is dead, we will not leak memory
 			// with a forever-running goroutine
 			instance.mutex.global.RLock()
-			if (instance.Status == Stopping) || (!instance.IsAlive()) {
+			stopping := (instance.Status == Stopping) || (!instance.IsAlive())
+			instance.mutex.global.RUnlock()
+
+			if stopping {
 				break
 			}
-			instance.mutex.global.RUnlock()
-			time.Sleep(1 * time.Second)
+			time.Sleep(10 * time.Millisecond)
 		}
 	}()
 
@@ -593,7 +607,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 		} else if (function.From != nil) && (function.To == nil) {
 			// the function is an ENDPOINT NODE of the Pipeline if no data is being sent
 
-			quit := make(chan bool)
+			quit := make(chan bool, 1)
 			function.Mutex.Lock()
 			function.Quit = append(function.Quit, quit)
 			function.Mutex.Unlock()
@@ -693,7 +707,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 				}
 			}()
 
-			quit := make(chan bool)
+			quit := make(chan bool, 1)
 			function.Mutex.Lock()
 			function.Quit = append(function.Quit, quit)
 			function.Mutex.Unlock()
@@ -739,61 +753,39 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 						} else {
 							results, drop := supervisor.call(function, request.Data)
 
-							function.To.Mutex.Lock()
 							if !drop {
-
-								// PROPOSAL 6.
-								// ~let there be two functions f1 and f2 that are transformers along the Pipeline.
-								// ~let f1 return a slice of type A s.t. []A is the passed along value
-								// ~let f2 accept a value of type A s.t. we expect f1 to send us A
-								//
-								// if (f1 sends to f2) and (f1 returns []A while f2 accepts A) then:
-								// the Pipeline shall break apart the []A returned by f1
-								// (and) push each element A from the slice to the successive function f2
+								isSliceExplosion := false
 								if len(results) > 0 && results[0].Kind() == reflect.Slice {
-
-									// note: we should always have some receiver to pull data from the channel but
-									//		 this is a safety guard if something goes wrong
 									if len(function.To.Receiver) > 0 {
 										nextFunction := function.To.Receiver[0]
 										nextFunctionReflection := nextFunction.Reflected.Type
-
-										// note: the value should accept some value or the Pipeline we've provisioned
-										// 		 is invalid and should have been rejected prior to this step
-										//
-										// [!] Dec 21 ~ fix : original implementation did not account for injectable
-										//					  values that were introduced in November 2024.
-										//					-> the parameter checked should be an offset of the injectable
-										//					   s.t. if we have 2 injectables, the param checked is +2
 										if (nextFunctionReflection.NumIn() > instance.numOfInjectables) && (nextFunctionReflection.In(instance.numOfInjectables).Kind() != reflect.Slice) {
-
-											// f1 returns []A and f2 accepts A has been validated upto this point
-											// we should break apart []A and send the data 1-by-1 to f2
-											for i := 0; i < results[0].Len(); i++ {
-												function.To.Stats.Pushed++
-												function.To.Value.Push([]reflect.Value{results[0].Index(i)})
-											}
-										} else {
-											// default functionality
-											function.To.Stats.Pushed++
-											function.To.Value.Push(results)
+											isSliceExplosion = true
 										}
-									} else {
-										// default functionality
-										function.To.Stats.Pushed++
-										function.To.Value.Push(results)
 									}
-
-								} else {
-									// default functionality
-									function.To.Stats.Pushed++
-									function.To.Value.Push(results)
 								}
 
+								if isSliceExplosion {
+									sliceLen := results[0].Len()
+									function.To.Mutex.Lock()
+									function.To.Stats.Pushed += uint64(sliceLen)
+									function.To.Mutex.Unlock()
+
+									for i := 0; i < sliceLen; i++ {
+										function.To.Value.Push([]reflect.Value{results[0].Index(i)})
+									}
+								} else {
+									function.To.Mutex.Lock()
+									function.To.Stats.Pushed++
+									function.To.Mutex.Unlock()
+
+									function.To.Value.Push(results)
+								}
 							} else {
+								function.From.Mutex.Lock()
 								function.From.Stats.Dropped++
+								function.From.Mutex.Unlock()
 							}
-							function.To.Mutex.Unlock()
 						}
 					}
 				case <-quit:
@@ -816,14 +808,17 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 					if function.Config.WaitBefore {
 						results, drop := supervisor.call(function, []reflect.Value{queuedRequests})
 
-						function.To.Mutex.Lock()
 						if !drop {
+							function.To.Mutex.Lock()
 							function.To.Stats.Pushed++
+							function.To.Mutex.Unlock()
+
 							function.To.Value.Push(results)
 						} else {
+							function.From.Mutex.Lock()
 							function.From.Stats.Dropped++
+							function.From.Mutex.Unlock()
 						}
-						function.To.Mutex.Unlock()
 					}
 					break
 				}
@@ -846,14 +841,16 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 // terminates a running instance of type pFunction.
 func (instance *pipelineRuntime) remove(function *pFunction) {
 
-	function.Mutex.RLock()
+	function.Mutex.Lock()
 	if function.Stats.Active <= 0 {
+		function.Mutex.Unlock()
 		panic("attempting to quit when no functions are running")
 	}
-	defer function.Mutex.RUnlock()
 
 	quit := function.Quit[0]
 	function.Quit = function.Quit[1:]
+	function.Mutex.Unlock()
+
 	quit <- true
 }
 
@@ -897,16 +894,24 @@ func (instance *pipelineRuntime) close() {
 
 	instance.waitGroup.startup.Wait()
 
-	var err error
-	for _, f := range instance.Pipeline.roots {
-		f.Mutex.Lock()
-		f.Stats.Active--
-		f.Mutex.Unlock()
+	if instance.testing {
+		var err error
+		for _, f := range instance.Pipeline.roots {
+			f.Mutex.Lock()
+			f.Stats.Active--
+			f.Mutex.Unlock()
 
-		err = f.To.Value.ProducerDone()
-		if err != nil {
-			fmt.Println(err)
+			err = f.To.Value.ProducerDone()
+			if err != nil {
+				fmt.Println(err)
+			}
 		}
+	}
+
+	instance.event(Suspend)
+
+	for instance.IsAlive() {
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
