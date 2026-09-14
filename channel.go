@@ -90,7 +90,8 @@ type managedChannel struct {
 		channelFinished bool
 	}
 
-	mutex sync.RWMutex
+	mutex     sync.RWMutex
+	closeLock sync.RWMutex
 
 	wg sync.WaitGroup
 }
@@ -138,7 +139,15 @@ func newManagedChannel(name string, threshold uint32, growth float64, stats *Tim
 
 func (mc *managedChannel) Push(data []reflect.Value) bool {
 
+	if data == nil {
+		return false
+	}
+
 	mc.mutex.Lock()
+	if mc.cFlags.stopNewPushes || mc.cFlags.channelFinished {
+		mc.mutex.Unlock()
+		return false
+	}
 
 	// see if we are hitting a threshold and the successive function is
 	// getting overloaded with data units
@@ -151,11 +160,24 @@ func (mc *managedChannel) Push(data []reflect.Value) bool {
 
 	currentTime := time.Now()
 	mc.LastPush = currentTime
-
-	stop := mc.cFlags.stopNewPushes
 	mc.mutex.Unlock()
 
-	if data == nil || stop {
+	mc.closeLock.RLock()
+	defer mc.closeLock.RUnlock()
+
+	mc.mutex.Lock()
+	stop := mc.cFlags.stopNewPushes || mc.cFlags.channelFinished
+	if stop {
+		if mc.cSize > 0 {
+			mc.cSize--
+		}
+		if mc.TotalProcessed > 0 {
+			mc.TotalProcessed--
+		}
+	}
+	mc.mutex.Unlock()
+
+	if stop {
 		return false
 	}
 
@@ -197,7 +219,7 @@ func (mc *managedChannel) Accepting() bool {
 	mc.mutex.RLock()
 	defer mc.mutex.RUnlock()
 
-	return !mc.cFlags.stopNewPushes
+	return !mc.cFlags.stopNewPushes && !mc.cFlags.channelFinished
 }
 
 func (mc *managedChannel) StopPushes() {
@@ -219,18 +241,25 @@ func (mc *managedChannel) AddProducer() {
 func (mc *managedChannel) ProducerDone() error {
 
 	mc.mutex.Lock()
-	defer mc.mutex.Unlock()
 
 	// Terminate the function if the call is invalid.
 	if mc.NumOfProducers <= 0 {
+		mc.mutex.Unlock()
 		return errors.New("cannot call ProducerDone() when there are no producers")
 	}
 
 	mc.NumOfProducers--
-	if !mc.cFlags.channelFinished && (mc.NumOfProducers <= 0) {
+	shouldClose := !mc.cFlags.channelFinished && (mc.NumOfProducers <= 0)
+	if shouldClose {
 		mc.cFlags.channelFinished = true
 		mc.cFlags.stopNewPushes = true
+	}
+	mc.mutex.Unlock()
+
+	if shouldClose {
+		mc.closeLock.Lock()
 		close(mc.channel)
+		mc.closeLock.Unlock()
 	}
 
 	return nil

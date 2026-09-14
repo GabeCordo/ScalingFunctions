@@ -14,16 +14,16 @@ jobs:
       pull-requests: write
       checks: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
           fetch-depth: 0  # a full history is required for pull request analysis
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: '^1.20.1' # The Go version to download (if necessary) and use.
       - run: go version
       - name: check test coverage
-        run: go test ./... -covermode=atomic -coverpkg=./...
+        run: go test $(go list ./... | grep -v '/examples') -covermode=atomic -coverpkg=$(go list ./... | grep -v '/examples' | paste -sd, -)
   gorace:
     runs-on: ubuntu-latest
     permissions:
@@ -31,13 +31,13 @@ jobs:
       pull-requests: write
       checks: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
           fetch-depth: 0  # a full history is required for pull request analysis
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: '^1.20.1' # The Go version to download (if necessary) and use.
       - run: go version
       - name: check test coverage
-        run: go test ./... -tags=race -race -covermode=atomic -coverpkg=./...
+        run: go test $(go list ./... | grep -v '/examples') -tags=race -race -covermode=atomic -coverpkg=$(go list ./... | grep -v '/examples' | paste -sd, -)

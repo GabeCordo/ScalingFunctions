@@ -514,6 +514,8 @@ func TestStressScenario(t *testing.T) {
 		}
 
 		if pipelineDone {
+			s := *i.GetStatistics()
+			ss = append(ss, s)
 			break
 		}
 	}
@@ -526,6 +528,6 @@ func TestStressScenario(t *testing.T) {
 	t.Logf("Captured %d statistics\n", len(ss))
 
 	if ss[len(ss)-1].Pipes[0].Pulled != numberOfPackets {
-		t.Errorf("expected the number of packets in the final statistic capture to equal %d\n", numberOfPackets)
+		t.Errorf("expected the number of packets in the final statistic capture to equal %d, got %d\n", numberOfPackets, ss[len(ss)-1].Pipes[0].Pulled)
 	}
 }
