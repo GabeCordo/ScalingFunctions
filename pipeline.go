@@ -260,3 +260,29 @@ func (pipeline Pipeline) createInteractable() Interactable {
 	pipeline.flags.interactableCreated = true
 	return interactable
 }
+
+func (pipeline Pipeline) getStatisticsSnapshot() *Statistics {
+	if pipeline.Stats == nil {
+		return nil
+	}
+	snapshot := NewStatistics(pipeline.Stats.NumOfFunctions, pipeline.Stats.NumOfChannels)
+	for i := range pipeline.Stats.Functions {
+		snapshot.Functions[i].Active = pipeline.Stats.Functions[i].GetActive()
+		snapshot.Functions[i].Provisions = pipeline.Stats.Functions[i].GetProvisions()
+	}
+	for i := range pipeline.Stats.Pipes {
+		snapshot.Pipes[i].Pushed = pipeline.Stats.Pipes[i].GetPushed()
+		snapshot.Pipes[i].Pulled = pipeline.Stats.Pipes[i].GetPulled()
+		snapshot.Pipes[i].Dropped = pipeline.Stats.Pipes[i].GetDropped()
+		snapshot.Pipes[i].Breaches = pipeline.Stats.Pipes[i].GetBreaches()
+		if i < len(pipeline.channels) && pipeline.channels[i] != nil && pipeline.channels[i].Value != nil {
+			pipeline.channels[i].Value.mutex.Lock()
+			if pipeline.channels[i].Value.Statistics != nil {
+				snapshot.Pipes[i].Timing = *pipeline.channels[i].Value.Statistics
+			}
+			pipeline.channels[i].Value.mutex.Unlock()
+		}
+	}
+	return snapshot
+}
+

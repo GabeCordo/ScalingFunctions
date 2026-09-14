@@ -111,14 +111,20 @@ func Test_Module_GetIR(t *testing.T) {
 		t.Error("expected the moduleIR to have an identifier of 'common'")
 	}
 
-	for idx, function := range ir.Functions {
-
-		if (idx == 0) && function.Identifier != "add" {
-			t.Error("expected the moduleIR to have an identifier of 'add'")
-		} else if (idx == 1) && function.Identifier != "print" {
-			t.Error("expected the moduleIR to have an identifier of 'print'")
+	foundAdd := false
+	foundPrint := false
+	for _, function := range ir.Functions {
+		if function.Identifier == "add" {
+			foundAdd = true
+		} else if function.Identifier == "print" {
+			foundPrint = true
 		}
-
+	}
+	if !foundAdd {
+		t.Error("expected the moduleIR to contain function 'add'")
+	}
+	if !foundPrint {
+		t.Error("expected the moduleIR to contain function 'print'")
 	}
 }
 

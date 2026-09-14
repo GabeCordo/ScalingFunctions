@@ -36,11 +36,12 @@ func (interactable Interactable) Run(injectables ...any) error {
 }
 
 func (interactable Interactable) GetStatus() RunStatus {
-	return interactable.runtime.Status
+	return interactable.runtime.getStatus()
 }
 
 func (interactable Interactable) IsRunning() bool {
-	return !((interactable.runtime.Status == Terminated) || (interactable.runtime.Status == Failed))
+	status := interactable.runtime.getStatus()
+	return !((status == Terminated) || (status == Failed))
 }
 
 func (interactable Interactable) Stop() {
@@ -50,7 +51,7 @@ func (interactable Interactable) Stop() {
 
 func (interactable Interactable) GetStatistics() *Statistics {
 
-	return interactable.pipeline.Stats
+	return interactable.pipeline.getStatisticsSnapshot()
 }
 
 type TestReport struct {

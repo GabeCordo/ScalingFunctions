@@ -71,6 +71,23 @@ jobs:
 
           with open('coverage/badge.svg', 'w') as f:
               f.write(svg)
+
+          import json
+          if val >= 80:
+              shields_color = 'brightgreen'
+          elif val >= 60:
+              shields_color = 'yellow'
+          else:
+              shields_color = 'red'
+
+          endpoint_data = {
+              "schemaVersion": 1,
+              "label": "coverage",
+              "message": cov_str,
+              "color": shields_color
+          }
+          with open('coverage/coverage.json', 'w') as f:
+              json.dump(endpoint_data, f)
           "
 
       - name: Deploy Coverage Report to GitHub Pages

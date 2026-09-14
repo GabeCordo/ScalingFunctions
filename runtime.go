@@ -194,10 +194,8 @@ func (instance *pipelineRuntime) startup() error {
 		for j := uint16(0); (j < function.Config.StartWith) && (function.Config.Maximum == 0 || j < function.Config.Maximum); j++ {
 			instance.provision(function)
 
-			// note: these statistics are not run in parallel
-			//		 ~ there is not risk of a data race
-			function.Stats.Active++
-			function.Stats.Provisions++
+			function.Stats.AddActive(1)
+			function.Stats.IncProvisions()
 		}
 	}
 
@@ -212,7 +210,7 @@ func (instance *pipelineRuntime) runtime() {
 	for {
 		// if the pipeline has been terminated we should end the
 		// runtime loop of checking the channels and scaling functions
-		if instance.Status == Terminated {
+		if instance.getStatus() == Terminated {
 			break
 		}
 
@@ -221,20 +219,20 @@ func (instance *pipelineRuntime) runtime() {
 
 			channelState := chn.Value.GetState()
 
-			if (instance.Status == Stopping) && chn.Value.Accepting() {
+			if (instance.getStatus() == Stopping) && chn.Value.Accepting() {
 				chn.Value.StopPushes()
 			}
 
 			if channelState == Congested {
 
-				chn.Stats.Breaches++
+				chn.Stats.IncBreaches()
 
 				for _, f := range chn.Receiver {
 					n := chn.Config.GrowthFactor
-					for (n > 0) && (f.Stats.Active < f.Config.Maximum) {
+					for (n > 0) && (f.Stats.GetActive() < uint32(f.Config.Maximum)) {
 						f.Mutex.Lock()
-						f.Stats.Provisions++
-						f.Stats.Active++
+						f.Stats.IncProvisions()
+						f.Stats.AddActive(1)
 						f.Mutex.Unlock()
 						instance.provision(f)
 						n--
@@ -249,12 +247,12 @@ func (instance *pipelineRuntime) runtime() {
 						f.Mutex.RLock()
 						// never remove all transform nodes otherwise we risk the
 						// ET channel having no consumers
-						if f.Stats.Active <= 1 {
+						if f.Stats.GetActive() <= 1 {
 							f.Mutex.RUnlock()
 							break
 						}
 						f.Mutex.RUnlock()
-						f.Stats.Active--
+						f.Stats.AddActive(-1)
 						instance.remove(f)
 						n--
 					}
@@ -371,6 +369,12 @@ func (instance *pipelineRuntime) event(event runEvent) bool {
 	}
 
 	return true // represents a boolean ~ hasStateChanged?
+}
+
+func (instance *pipelineRuntime) getStatus() RunStatus {
+	instance.mutex.global.RLock()
+	defer instance.mutex.global.RUnlock()
+	return instance.Status
 }
 
 func (instance *pipelineRuntime) IsAlive() bool {
@@ -596,9 +600,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 				}
 			}
 
-			function.Mutex.Lock()
-			function.Stats.Active--
-			function.Mutex.Unlock()
+			function.Stats.AddActive(-1)
 
 			// if the number of producers is 0, the ET channel will close that
 			// allows the Transform goroutines to terminate once they have
@@ -647,9 +649,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 							break
 						}
 
-						function.From.Mutex.Lock()
-						function.From.Stats.Pulled++
-						function.From.Mutex.Unlock()
+						function.From.Stats.IncPulled()
 
 						// associates a TimeOut to the data being removed from the channel and decrements
 						// the data counter for the current pipe
@@ -676,9 +676,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 				if closeChan {
 
 					if terminationCause == Complete {
-						function.Mutex.Lock()
-						function.Stats.Active--
-						function.Mutex.Unlock()
+						function.Stats.AddActive(-1)
 					}
 
 					// if we were waiting for the channel to close before transforming the data,
@@ -740,9 +738,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 						// the data counter for the current pipe
 						function.From.Value.DataPopped(request.In)
 
-						function.From.Mutex.Lock()
-						function.From.Stats.Pulled++
-						function.From.Mutex.Unlock()
+						function.From.Stats.IncPulled()
 
 						// what: the developer has an option to wait for all the data to be received by a
 						// channel before processing that data.
@@ -767,24 +763,18 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 
 								if isSliceExplosion {
 									sliceLen := results[0].Len()
-									function.To.Mutex.Lock()
-									function.To.Stats.Pushed += uint64(sliceLen)
-									function.To.Mutex.Unlock()
+									function.To.Stats.IncPushed(uint64(sliceLen))
 
 									for i := 0; i < sliceLen; i++ {
 										function.To.Value.Push([]reflect.Value{results[0].Index(i)})
 									}
 								} else {
-									function.To.Mutex.Lock()
-									function.To.Stats.Pushed++
-									function.To.Mutex.Unlock()
+									function.To.Stats.IncPushed(1)
 
 									function.To.Value.Push(results)
 								}
 							} else {
-								function.From.Mutex.Lock()
-								function.From.Stats.Dropped++
-								function.From.Mutex.Unlock()
+								function.From.Stats.IncDropped()
 							}
 						}
 					}
@@ -798,9 +788,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 				if closeChan {
 
 					if terminationCause == Complete {
-						function.Mutex.Lock()
-						function.Stats.Active--
-						function.Mutex.Unlock()
+						function.Stats.AddActive(-1)
 					}
 
 					// if we were waiting for the channel to close before transforming the data,
@@ -809,15 +797,11 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 						results, drop := supervisor.call(function, []reflect.Value{queuedRequests})
 
 						if !drop {
-							function.To.Mutex.Lock()
-							function.To.Stats.Pushed++
-							function.To.Mutex.Unlock()
+							function.To.Stats.IncPushed(1)
 
 							function.To.Value.Push(results)
 						} else {
-							function.From.Mutex.Lock()
-							function.From.Stats.Dropped++
-							function.From.Mutex.Unlock()
+							function.From.Stats.IncDropped()
 						}
 					}
 					break
@@ -841,12 +825,11 @@ func (instance *pipelineRuntime) provision(function *pFunction) {
 // terminates a running instance of type pFunction.
 func (instance *pipelineRuntime) remove(function *pFunction) {
 
-	function.Mutex.Lock()
-	if function.Stats.Active <= 0 {
-		function.Mutex.Unlock()
+	if function.Stats.GetActive() == 0 {
 		panic("attempting to quit when no functions are running")
 	}
 
+	function.Mutex.Lock()
 	quit := function.Quit[0]
 	function.Quit = function.Quit[1:]
 	function.Mutex.Unlock()
@@ -897,9 +880,7 @@ func (instance *pipelineRuntime) close() {
 	if instance.testing {
 		var err error
 		for _, f := range instance.Pipeline.roots {
-			f.Mutex.Lock()
-			f.Stats.Active--
-			f.Mutex.Unlock()
+			f.Stats.AddActive(-1)
 
 			err = f.To.Value.ProducerDone()
 			if err != nil {
