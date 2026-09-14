@@ -90,11 +90,8 @@ type managedChannel struct {
 		channelFinished bool
 	}
 
-	cMutexes struct {
-		state    sync.RWMutex // guards writing and closing the channel
-		producer sync.RWMutex // guards 'NumOfProducers' and 'cStatus'
-		size     sync.Mutex   // guards 'cSize', 'TotalProcessed', and statistics.
-	}
+	mutex     sync.RWMutex
+	closeLock sync.RWMutex
 
 	wg sync.WaitGroup
 }
@@ -142,14 +139,20 @@ func newManagedChannel(name string, threshold uint32, growth float64, stats *Tim
 
 func (mc *managedChannel) Push(data []reflect.Value) bool {
 
-	mc.cMutexes.size.Lock()
+	if data == nil {
+		return false
+	}
+
+	mc.mutex.Lock()
+	if mc.cFlags.stopNewPushes || mc.cFlags.channelFinished {
+		mc.mutex.Unlock()
+		return false
+	}
 
 	// see if we are hitting a threshold and the successive function is
 	// getting overloaded with data units
 	if (mc.cSize + 1) >= mc.Config.Threshold {
-		mc.cMutexes.producer.Lock()
 		mc.cStatus = Congested
-		mc.cMutexes.producer.Unlock()
 	}
 
 	mc.cSize++
@@ -157,32 +160,22 @@ func (mc *managedChannel) Push(data []reflect.Value) bool {
 
 	currentTime := time.Now()
 	mc.LastPush = currentTime
+	mc.mutex.Unlock()
 
-	// before writing on the channel we want to release the mutex otherwise
-	// the managed channel can enter a deadlock;
-	//
-	// producer: wants to send more data onto the managedChannel but has to
-	//			 wait until the channel has buffer to allow it
-	//			 -> channel send is blocked
-	//
-	// consumer: wants to read data from the managedChannel and decrement the
-	//			 size but it needs to enter the mutex to do that.
-	//			 -> the mutex on DataPopped() will block waiting for the chance
-	//				to write to the queue
-	//				BUT
-	//				since the producer is waiting to write to the channel and
-	//				the consumer can't continue pulling data off the queue we
-	//				enter an infinite deadlock!
-	mc.cMutexes.size.Unlock()
+	mc.closeLock.RLock()
+	defer mc.closeLock.RUnlock()
 
-	if data == nil {
-		return false
+	mc.mutex.Lock()
+	stop := mc.cFlags.stopNewPushes || mc.cFlags.channelFinished
+	if stop {
+		if mc.cSize > 0 {
+			mc.cSize--
+		}
+		if mc.TotalProcessed > 0 {
+			mc.TotalProcessed--
+		}
 	}
-
-	// don't push to the channel if it is supposed to be closed
-	mc.cMutexes.state.RLock()
-	stop := mc.cFlags.stopNewPushes
-	mc.cMutexes.state.RUnlock()
+	mc.mutex.Unlock()
 
 	if stop {
 		return false
@@ -195,8 +188,8 @@ func (mc *managedChannel) Push(data []reflect.Value) bool {
 
 func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) {
 
-	mc.cMutexes.size.Lock()
-	defer mc.cMutexes.size.Unlock()
+	mc.mutex.Lock()
+	defer mc.mutex.Unlock()
 
 	timeOutOfQueue := time.Now()
 	totalTimeInQueue := timeOutOfQueue.Sub(timeIntoQueue)
@@ -215,59 +208,64 @@ func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) {
 		mc.Statistics.MinTimeBeforePop = totalTimeInQueue
 	}
 
-	mc.cSize--
-	mc.GetState()
+	if mc.cSize > 0 {
+		mc.cSize--
+	}
+	mc.getStateLocked()
 }
 
 func (mc *managedChannel) Accepting() bool {
 
-	mc.cMutexes.size.Lock()
-	defer mc.cMutexes.size.Unlock()
+	mc.mutex.RLock()
+	defer mc.mutex.RUnlock()
 
-	return !mc.cFlags.stopNewPushes
+	return !mc.cFlags.stopNewPushes && !mc.cFlags.channelFinished
 }
 
 func (mc *managedChannel) StopPushes() {
 
-	mc.cMutexes.size.Lock()
-	defer mc.cMutexes.size.Unlock()
+	mc.mutex.Lock()
+	defer mc.mutex.Unlock()
 
 	mc.cFlags.stopNewPushes = true
 }
 
 func (mc *managedChannel) AddProducer() {
-	mc.cMutexes.producer.Lock()
-	defer mc.cMutexes.producer.Unlock()
+
+	mc.mutex.Lock()
+	defer mc.mutex.Unlock()
 
 	mc.NumOfProducers++
 }
 
 func (mc *managedChannel) ProducerDone() error {
 
-	mc.cMutexes.producer.Lock()
-	defer mc.cMutexes.producer.Unlock()
+	mc.mutex.Lock()
 
 	// Terminate the function if the call is invalid.
 	if mc.NumOfProducers <= 0 {
+		mc.mutex.Unlock()
 		return errors.New("cannot call ProducerDone() when there are no producers")
 	}
 
 	mc.NumOfProducers--
-	if !mc.cFlags.channelFinished && (mc.NumOfProducers <= 0) {
-		mc.cMutexes.state.Lock()
+	shouldClose := !mc.cFlags.channelFinished && (mc.NumOfProducers <= 0)
+	if shouldClose {
 		mc.cFlags.channelFinished = true
 		mc.cFlags.stopNewPushes = true
+	}
+	mc.mutex.Unlock()
+
+	if shouldClose {
+		mc.closeLock.Lock()
 		close(mc.channel)
-		mc.cMutexes.state.Unlock()
+		mc.closeLock.Unlock()
 	}
 
 	return nil
 }
 
-func (mc *managedChannel) GetState() channelStatus {
-
-	mc.cMutexes.producer.Lock()
-	defer mc.cMutexes.producer.Unlock()
+func (mc *managedChannel) getStateLocked() channelStatus {
 
 	if mc.cFlags.channelFinished {
 		mc.cStatus = Closed
@@ -286,4 +284,12 @@ func (mc *managedChannel) GetState() channelStatus {
 	}
 
 	return mc.cStatus
+}
+
+func (mc *managedChannel) GetState() channelStatus {
+
+	mc.mutex.Lock()
+	defer mc.mutex.Unlock()
+
+	return mc.getStateLocked()
 }

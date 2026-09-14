@@ -1,5 +1,10 @@
 # ScalingFunctions Framework
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/GabeCordo/ScalingFunctions.svg)](https://pkg.go.dev/github.com/GabeCordo/ScalingFunctions)
+[![Build Status](https://github.com/GabeCordo/ScalingFunctions/actions/workflows/go_checkers.yml/badge.svg)](https://github.com/GabeCordo/ScalingFunctions/actions/workflows/go_checkers.yml)
+[![Coverage Status](https://img.shields.io/endpoint?url=https://gabecordo.github.io/ScalingFunctions/coverage.json)](https://gabecordo.github.io/ScalingFunctions/)
+[![License](https://img.shields.io/github/license/GabeCordo/ScalingFunctions)](./LICENSE)
+
 <img src="./docs/assets/Pangolin_Icon.svg" width="50%">
 
 `ScalingFunctions` is an open source framework for building vertically scalable data pipelines.
