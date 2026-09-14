@@ -81,10 +81,10 @@ jobs:
               shields_color = 'red'
 
           endpoint_data = {
-              "schemaVersion": 1,
-              "label": "coverage",
-              "message": cov_str,
-              "color": shields_color
+              'schemaVersion': 1,
+              'label': 'coverage',
+              'message': cov_str,
+              'color': shields_color
           }
           with open('coverage/coverage.json', 'w') as f:
               json.dump(endpoint_data, f)
