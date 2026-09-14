@@ -59,23 +59,21 @@
 				
 				<option value="file1">github.com/GabeCordo/ScalingFunctions/builder.go (91.3%)</option>
 				
-				<option value="file2">github.com/GabeCordo/ScalingFunctions/channel.go (100.0%)</option>
+				<option value="file2">github.com/GabeCordo/ScalingFunctions/channel.go (95.3%)</option>
 				
-				<option value="file3">github.com/GabeCordo/ScalingFunctions/examples/three-consumers/main.go (0.0%)</option>
+				<option value="file3">github.com/GabeCordo/ScalingFunctions/interactable.go (21.2%)</option>
 				
-				<option value="file4">github.com/GabeCordo/ScalingFunctions/interactable.go (18.8%)</option>
+				<option value="file4">github.com/GabeCordo/ScalingFunctions/internal/builders/builders.go (100.0%)</option>
 				
-				<option value="file5">github.com/GabeCordo/ScalingFunctions/internal/builders/builders.go (100.0%)</option>
+				<option value="file5">github.com/GabeCordo/ScalingFunctions/ir.go (91.0%)</option>
 				
-				<option value="file6">github.com/GabeCordo/ScalingFunctions/ir.go (91.0%)</option>
+				<option value="file6">github.com/GabeCordo/ScalingFunctions/pipeline.go (91.7%)</option>
 				
-				<option value="file7">github.com/GabeCordo/ScalingFunctions/pipeline.go (91.0%)</option>
+				<option value="file7">github.com/GabeCordo/ScalingFunctions/repository.go (97.4%)</option>
 				
-				<option value="file8">github.com/GabeCordo/ScalingFunctions/repository.go (97.4%)</option>
+				<option value="file8">github.com/GabeCordo/ScalingFunctions/runtime.go (59.4%)</option>
 				
-				<option value="file9">github.com/GabeCordo/ScalingFunctions/runtime.go (58.6%)</option>
-				
-				<option value="file10">github.com/GabeCordo/ScalingFunctions/statistics.go (100.0%)</option>
+				<option value="file9">github.com/GabeCordo/ScalingFunctions/statistics.go (92.3%)</option>
 				
 				</select>
 			</div>
@@ -554,11 +552,8 @@ type managedChannel struct {
                 channelFinished bool
         }
 
-        cMutexes struct {
-                state    sync.RWMutex // guards writing and closing the channel
-                producer sync.RWMutex // guards 'NumOfProducers' and 'cStatus'
-                size     sync.Mutex   // guards 'cSize', 'TotalProcessed', and statistics.
-        }
+        mutex     sync.RWMutex
+        closeLock sync.RWMutex
 
         wg sync.WaitGroup
 }
@@ -606,49 +601,45 @@ func newManagedChannel(name string, threshold uint32, growth float64, stats *Tim
 
 func (mc *managedChannel) Push(data []reflect.Value) bool <span class="cov9" title="3154">{
 
-        mc.cMutexes.size.Lock()
-
-        // see if we are hitting a threshold and the successive function is
-        // getting overloaded with data units
-        if (mc.cSize + 1) &gt;= mc.Config.Threshold </span><span class="cov9" title="3154">{
-                mc.cMutexes.producer.Lock()
-                mc.cStatus = Congested
-                mc.cMutexes.producer.Unlock()
-        }</span>
-
-        <span class="cov9" title="3154">mc.cSize++
-        mc.TotalProcessed++
-
-        currentTime := time.Now()
-        mc.LastPush = currentTime
-
-        // before writing on the channel we want to release the mutex otherwise
-        // the managed channel can enter a deadlock;
-        //
-        // producer: wants to send more data onto the managedChannel but has to
-        //                         wait until the channel has buffer to allow it
-        //                         -&gt; channel send is blocked
-        //
-        // consumer: wants to read data from the managedChannel and decrement the
-        //                         size but it needs to enter the mutex to do that.
-        //                         -&gt; the mutex on DataPopped() will block waiting for the chance
-        //                                to write to the queue
-        //                                BUT
-        //                                since the producer is waiting to write to the channel and
-        //                                the consumer can't continue pulling data off the queue we
-        //                                enter an infinite deadlock!
-        mc.cMutexes.size.Unlock()
-
         if data == nil </span><span class="cov1" title="2">{
                 return false
         }</span>
 
-        // don't push to the channel if it is supposed to be closed
-        <span class="cov9" title="3152">mc.cMutexes.state.RLock()
-        stop := mc.cFlags.stopNewPushes
-        mc.cMutexes.state.RUnlock()
+        <span class="cov9" title="3152">mc.mutex.Lock()
+        if mc.cFlags.stopNewPushes || mc.cFlags.channelFinished </span><span class="cov1" title="2">{
+                mc.mutex.Unlock()
+                return false
+        }</span>
 
-        if stop </span><span class="cov1" title="2">{
+        // see if we are hitting a threshold and the successive function is
+        // getting overloaded with data units
+        <span class="cov9" title="3150">if (mc.cSize + 1) &gt;= mc.Config.Threshold </span><span class="cov9" title="3150">{
+                mc.cStatus = Congested
+        }</span>
+
+        <span class="cov9" title="3150">mc.cSize++
+        mc.TotalProcessed++
+
+        currentTime := time.Now()
+        mc.LastPush = currentTime
+        mc.mutex.Unlock()
+
+        mc.closeLock.RLock()
+        defer mc.closeLock.RUnlock()
+
+        mc.mutex.Lock()
+        stop := mc.cFlags.stopNewPushes || mc.cFlags.channelFinished
+        if stop </span><span class="cov0" title="0">{
+                if mc.cSize &gt; 0 </span><span class="cov0" title="0">{
+                        mc.cSize--
+                }</span>
+                <span class="cov0" title="0">if mc.TotalProcessed &gt; 0 </span><span class="cov0" title="0">{
+                        mc.TotalProcessed--
+                }</span>
+        }
+        <span class="cov9" title="3150">mc.mutex.Unlock()
+
+        if stop </span><span class="cov0" title="0">{
                 return false
         }</span>
 
@@ -659,16 +650,16 @@ func (mc *managedChannel) Push(data []reflect.Value) bool <span class="cov9" tit
 
 func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) <span class="cov9" title="3150">{
 
-        mc.cMutexes.size.Lock()
-        defer mc.cMutexes.size.Unlock()
+        mc.mutex.Lock()
+        defer mc.mutex.Unlock()
 
         timeOutOfQueue := time.Now()
         totalTimeInQueue := timeOutOfQueue.Sub(timeIntoQueue)
 
         if mc.Statistics.AverageTime != 0 </span><span class="cov9" title="3132">{
-                if totalTimeInQueue &gt; mc.Statistics.MaxTimeBeforePop </span><span class="cov5" title="79">{
+                if totalTimeInQueue &gt; mc.Statistics.MaxTimeBeforePop </span><span class="cov5" title="77">{
                         mc.Statistics.MaxTimeBeforePop = totalTimeInQueue
-                }</span> else<span class="cov9" title="3053"> if totalTimeInQueue &lt; mc.Statistics.MinTimeBeforePop </span><span class="cov5" title="46">{
+                }</span> else<span class="cov9" title="3055"> if totalTimeInQueue &lt; mc.Statistics.MinTimeBeforePop </span><span class="cov4" title="31">{
                         mc.Statistics.MinTimeBeforePop = totalTimeInQueue
                 }</span>
                 <span class="cov9" title="3132">mc.Statistics.AverageTime = (mc.Statistics.AverageTime + totalTimeInQueue) / 2</span>
@@ -679,162 +670,94 @@ func (mc *managedChannel) DataPopped(timeIntoQueue time.Time) <span class="cov9"
                 mc.Statistics.MinTimeBeforePop = totalTimeInQueue
         }</span>
 
-        <span class="cov9" title="3150">mc.cSize--
-        mc.GetState()</span>
+        <span class="cov9" title="3150">if mc.cSize &gt; 0 </span><span class="cov9" title="3150">{
+                mc.cSize--
+        }</span>
+        <span class="cov9" title="3150">mc.getStateLocked()</span>
 }
 
 func (mc *managedChannel) Accepting() bool <span class="cov2" title="6">{
 
-        mc.cMutexes.size.Lock()
-        defer mc.cMutexes.size.Unlock()
+        mc.mutex.RLock()
+        defer mc.mutex.RUnlock()
 
-        return !mc.cFlags.stopNewPushes
+        return !mc.cFlags.stopNewPushes &amp;&amp; !mc.cFlags.channelFinished
 }</span>
 
 func (mc *managedChannel) StopPushes() <span class="cov1" title="2">{
 
-        mc.cMutexes.size.Lock()
-        defer mc.cMutexes.size.Unlock()
+        mc.mutex.Lock()
+        defer mc.mutex.Unlock()
 
         mc.cFlags.stopNewPushes = true
 }</span>
 
 func (mc *managedChannel) AddProducer() <span class="cov4" title="23">{
-        mc.cMutexes.producer.Lock()
-        defer mc.cMutexes.producer.Unlock()
+
+        mc.mutex.Lock()
+        defer mc.mutex.Unlock()
 
         mc.NumOfProducers++
 }</span>
 
 func (mc *managedChannel) ProducerDone() error <span class="cov4" title="24">{
 
-        mc.cMutexes.producer.Lock()
-        defer mc.cMutexes.producer.Unlock()
+        mc.mutex.Lock()
 
         // Terminate the function if the call is invalid.
         if mc.NumOfProducers &lt;= 0 </span><span class="cov1" title="1">{
+                mc.mutex.Unlock()
                 return errors.New("cannot call ProducerDone() when there are no producers")
         }</span>
 
         <span class="cov4" title="23">mc.NumOfProducers--
-        if !mc.cFlags.channelFinished &amp;&amp; (mc.NumOfProducers &lt;= 0) </span><span class="cov4" title="23">{
-                mc.cMutexes.state.Lock()
+        shouldClose := !mc.cFlags.channelFinished &amp;&amp; (mc.NumOfProducers &lt;= 0)
+        if shouldClose </span><span class="cov4" title="23">{
                 mc.cFlags.channelFinished = true
                 mc.cFlags.stopNewPushes = true
+        }</span>
+        <span class="cov4" title="23">mc.mutex.Unlock()
+
+        if shouldClose </span><span class="cov4" title="23">{
+                mc.closeLock.Lock()
                 close(mc.channel)
-                mc.cMutexes.state.Unlock()
+                mc.closeLock.Unlock()
         }</span>
 
         <span class="cov4" title="23">return nil</span>
 }
 
-func (mc *managedChannel) GetState() channelStatus <span class="cov10" title="3224">{
+func (mc *managedChannel) getStateLocked() channelStatus <span class="cov10" title="3224">{
 
-        mc.cMutexes.producer.Lock()
-        defer mc.cMutexes.producer.Unlock()
-
-        if mc.cFlags.channelFinished </span><span class="cov6" title="167">{
+        if mc.cFlags.channelFinished </span><span class="cov6" title="170">{
                 mc.cStatus = Closed
-        }</span> else<span class="cov9" title="3057"> if mc.cSize == 0 </span><span class="cov9" title="3048">{
+        }</span> else<span class="cov9" title="3054"> if mc.cSize == 0 </span><span class="cov9" title="3048">{
                 if time.Now().Sub(mc.LastPush).Seconds() &gt; 3 </span><span class="cov4" title="21">{
                         mc.cStatus = Idle
                 }</span> else<span class="cov9" title="3027"> {
                         mc.cStatus = Empty
                 }</span>
-        } else<span class="cov3" title="9"> if ((mc.cStatus == Congested) || (mc.cStatus == Idle)) &amp;&amp; (mc.cSize &lt; mc.Config.UnderutilizedThreshold) </span><span class="cov1" title="1">{
+        } else<span class="cov2" title="6"> if ((mc.cStatus == Congested) || (mc.cStatus == Idle)) &amp;&amp; (mc.cSize &lt; mc.Config.UnderutilizedThreshold) </span><span class="cov1" title="1">{
                 mc.cStatus = Underutilized
-        }</span> else<span class="cov3" title="8"> if mc.cSize &gt; mc.Config.Threshold </span><span class="cov2" title="5">{
+        }</span> else<span class="cov2" title="5"> if mc.cSize &gt; mc.Config.Threshold </span><span class="cov2" title="4">{
                 mc.cStatus = Congested
-        }</span> else<span class="cov2" title="3"> {
+        }</span> else<span class="cov1" title="1"> {
                 mc.cStatus = Healthy
         }</span>
 
         <span class="cov10" title="3224">return mc.cStatus</span>
 }
+
+func (mc *managedChannel) GetState() channelStatus <span class="cov5" title="74">{
+
+        mc.mutex.Lock()
+        defer mc.mutex.Unlock()
+
+        return mc.getStateLocked()
+}</span>
 </pre>
 		
-		<pre class="file" id="file3" style="display: none">// Package main
-//
-// Copyright (c) 2026. Gabriel Cordovado
-// All rights reserved.
-//
-// Source file:  main.go
-//
-// Description: The three-consumers example demonstrates a pipeline with three consumers
-//
-//        and varrying drain rates.
-package main
-
-import (
-        "encoding/json"
-        "log"
-        "os"
-        "time"
-
-        "github.com/GabeCordo/ScalingFunctions"
-)
-
-////////////////////////////////////////////////////////////////////////////////////////
-//                                                                        Pipeline Functions
-////////////////////////////////////////////////////////////////////////////////////////
-
-func generator(out chan int) <span class="cov0" title="0">{
-        for i := 0; i &lt; 1000000; i++ </span><span class="cov0" title="0">{
-                out &lt;- i
-        }</span>
-        <span class="cov0" title="0">close(out)</span>
-}
-
-func stepOne(in int) (out int) <span class="cov0" title="0">{
-        time.Sleep(1 * time.Microsecond)
-        out = in
-        return in
-}</span>
-
-func stepTwo(in int) (out int) <span class="cov0" title="0">{
-        time.Sleep(5 * time.Microsecond)
-        out = in
-        return in
-}</span>
-
-func stepThree(in int) <span class="cov0" title="0">{
-        time.Sleep(3 * time.Microsecond)
-}</span>
-
-////////////////////////////////////////////////////////////////////////////////////////
-//                                                                          Framework Glue
-////////////////////////////////////////////////////////////////////////////////////////
-
-func main() <span class="cov0" title="0">{
-
-        statistics := make([]ScalingFunctions.Statistics, 0)
-
-        pipeline := ScalingFunctions.Build(generator, stepOne, stepTwo, stepThree)
-
-        go func() </span><span class="cov0" title="0">{
-                for </span><span class="cov0" title="0">{
-                        statistics = append(statistics, *pipeline.GetStatistics())
-                        time.Sleep(100 * time.Millisecond)
-                }</span>
-        }()
-
-        <span class="cov0" title="0">pipeline.Run()
-
-        file, err := os.Create("three-consumers.json")
-        if err != nil </span><span class="cov0" title="0">{
-                log.Panic(err)
-        }</span>
-        <span class="cov0" title="0">defer file.Close()
-
-        // Encodes and writes directly to the open file descriptor
-        err = json.NewEncoder(file).Encode(statistics)
-        if err != nil </span><span class="cov0" title="0">{
-                log.Panic(err)
-        }</span>
-}
-</pre>
-		
-		<pre class="file" id="file4" style="display: none">// Package ScalingFunctions
+		<pre class="file" id="file3" style="display: none">// Package ScalingFunctions
 //
 // Copyright (c) 2024-2026. Gabriel Cordovado
 // All rights reserved.
@@ -865,18 +788,19 @@ type Interactable struct {
         runtime  *pipelineRuntime
 }
 
-func (interactable Interactable) Run(injectables ...any) error <span class="cov9" title="10">{
+func (interactable Interactable) Run(injectables ...any) error <span class="cov8" title="10">{
 
         interactable.runtime.injectDependencies(injectables...)
         return interactable.runtime.start()
 }</span>
 
 func (interactable Interactable) GetStatus() RunStatus <span class="cov1" title="1">{
-        return interactable.runtime.Status
+        return interactable.runtime.getStatus()
 }</span>
 
 func (interactable Interactable) IsRunning() bool <span class="cov1" title="1">{
-        return !((interactable.runtime.Status == Terminated) || (interactable.runtime.Status == Failed))
+        status := interactable.runtime.getStatus()
+        return !((status == Terminated) || (status == Failed))
 }</span>
 
 func (interactable Interactable) Stop() <span class="cov3" title="2">{
@@ -884,9 +808,9 @@ func (interactable Interactable) Stop() <span class="cov3" title="2">{
         interactable.runtime.close()
 }</span>
 
-func (interactable Interactable) GetStatistics() *Statistics <span class="cov10" title="13">{
+func (interactable Interactable) GetStatistics() *Statistics <span class="cov10" title="14">{
 
-        return interactable.pipeline.Stats
+        return interactable.pipeline.getStatisticsSnapshot()
 }</span>
 
 type TestReport struct {
@@ -956,7 +880,7 @@ func (interactable Interactable) TestAs(f string, data any, injectables ...any) 
 }
 </pre>
 		
-		<pre class="file" id="file5" style="display: none">// Package ScalingFunctions
+		<pre class="file" id="file4" style="display: none">// Package ScalingFunctions
 //
 // Copyright (c) 2026. Gabriel Cordovado
 // All rights reserved.
@@ -1006,7 +930,7 @@ func CreateLoadFunction(loadDelay time.Duration) func(int) error <span class="co
 }
 </pre>
 		
-		<pre class="file" id="file6" style="display: none">// Package ScalingFunctions
+		<pre class="file" id="file5" style="display: none">// Package ScalingFunctions
 //
 // Copyright (c) 2024-2026. Gabriel Cordovado
 // All rights reserved.
@@ -1440,7 +1364,7 @@ func CleanupIR(ir any) error <span class="cov3" title="3">{
 }
 </pre>
 		
-		<pre class="file" id="file7" style="display: none">// Package ScalingFunctions
+		<pre class="file" id="file6" style="display: none">// Package ScalingFunctions
 //
 // Copyright (c) 2024-2026. Gabriel Cordovado
 // All rights reserved.
@@ -1702,9 +1626,35 @@ func (pipeline Pipeline) createInteractable() Interactable <span class="cov5" ti
         pipeline.flags.interactableCreated = true
         return interactable
 }</span>
+
+func (pipeline Pipeline) getStatisticsSnapshot() *Statistics <span class="cov6" title="14">{
+        if pipeline.Stats == nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov6" title="14">snapshot := NewStatistics(pipeline.Stats.NumOfFunctions, pipeline.Stats.NumOfChannels)
+        for i := range pipeline.Stats.Functions </span><span class="cov9" title="55">{
+                snapshot.Functions[i].Active = pipeline.Stats.Functions[i].GetActive()
+                snapshot.Functions[i].Provisions = pipeline.Stats.Functions[i].GetProvisions()
+        }</span>
+        <span class="cov6" title="14">for i := range pipeline.Stats.Pipes </span><span class="cov8" title="41">{
+                snapshot.Pipes[i].Pushed = pipeline.Stats.Pipes[i].GetPushed()
+                snapshot.Pipes[i].Pulled = pipeline.Stats.Pipes[i].GetPulled()
+                snapshot.Pipes[i].Dropped = pipeline.Stats.Pipes[i].GetDropped()
+                snapshot.Pipes[i].Breaches = pipeline.Stats.Pipes[i].GetBreaches()
+                if i &lt; len(pipeline.channels) &amp;&amp; pipeline.channels[i] != nil &amp;&amp; pipeline.channels[i].Value != nil </span><span class="cov8" title="41">{
+                        pipeline.channels[i].Value.mutex.Lock()
+                        if pipeline.channels[i].Value.Statistics != nil </span><span class="cov8" title="41">{
+                                snapshot.Pipes[i].Timing = *pipeline.channels[i].Value.Statistics
+                        }</span>
+                        <span class="cov8" title="41">pipeline.channels[i].Value.mutex.Unlock()</span>
+                }
+        }
+        <span class="cov6" title="14">return snapshot</span>
+}
+
 </pre>
 		
-		<pre class="file" id="file8" style="display: none">// Package ScalingFunctions
+		<pre class="file" id="file7" style="display: none">// Package ScalingFunctions
 //
 // Copyright (c) 2024-2026. Gabriel Cordovado
 // All rights reserved.
@@ -1819,7 +1769,7 @@ func (r *Repository) GetModules() (modules []*Module) <span class="cov1" title="
 }
 </pre>
 		
-		<pre class="file" id="file9" style="display: none">// Package ScalingFunctions
+		<pre class="file" id="file8" style="display: none">// Package ScalingFunctions
 //
 // Copyright (c) 2024-2026. Gabriel Cordovado
 // All rights reserved.
@@ -2015,10 +1965,8 @@ func (instance *pipelineRuntime) startup() error <span class="cov3" title="10">{
                 <span class="cov5" title="31">for j := uint16(0); (j &lt; function.Config.StartWith) &amp;&amp; (function.Config.Maximum == 0 || j &lt; function.Config.Maximum); j++ </span><span class="cov5" title="31">{
                         instance.provision(function)
 
-                        // note: these statistics are not run in parallel
-                        //                 ~ there is not risk of a data race
-                        function.Stats.Active++
-                        function.Stats.Provisions++
+                        function.Stats.AddActive(1)
+                        function.Stats.IncProvisions()
                 }</span>
         }
 
@@ -2033,7 +1981,7 @@ func (instance *pipelineRuntime) runtime() <span class="cov3" title="10">{
         for </span><span class="cov5" title="30">{
                 // if the pipeline has been terminated we should end the
                 // runtime loop of checking the channels and scaling functions
-                if instance.Status == Terminated </span><span class="cov0" title="0">{
+                if instance.getStatus() == Terminated </span><span class="cov0" title="0">{
                         break</span>
                 }
 
@@ -2042,20 +1990,20 @@ func (instance *pipelineRuntime) runtime() <span class="cov3" title="10">{
 
                         channelState := chn.Value.GetState()
 
-                        if (instance.Status == Stopping) &amp;&amp; chn.Value.Accepting() </span><span class="cov0" title="0">{
+                        if (instance.getStatus() == Stopping) &amp;&amp; chn.Value.Accepting() </span><span class="cov0" title="0">{
                                 chn.Value.StopPushes()
                         }</span>
 
                         <span class="cov6" title="72">if channelState == Congested </span><span class="cov0" title="0">{
 
-                                chn.Stats.Breaches++
+                                chn.Stats.IncBreaches()
 
                                 for _, f := range chn.Receiver </span><span class="cov0" title="0">{
                                         n := chn.Config.GrowthFactor
-                                        for (n &gt; 0) &amp;&amp; (f.Stats.Active &lt; f.Config.Maximum) </span><span class="cov0" title="0">{
+                                        for (n &gt; 0) &amp;&amp; (f.Stats.GetActive() &lt; uint32(f.Config.Maximum)) </span><span class="cov0" title="0">{
                                                 f.Mutex.Lock()
-                                                f.Stats.Provisions++
-                                                f.Stats.Active++
+                                                f.Stats.IncProvisions()
+                                                f.Stats.AddActive(1)
                                                 f.Mutex.Unlock()
                                                 instance.provision(f)
                                                 n--
@@ -2070,12 +2018,12 @@ func (instance *pipelineRuntime) runtime() <span class="cov3" title="10">{
                                                 f.Mutex.RLock()
                                                 // never remove all transform nodes otherwise we risk the
                                                 // ET channel having no consumers
-                                                if f.Stats.Active &lt;= 1 </span><span class="cov4" title="21">{
+                                                if f.Stats.GetActive() &lt;= 1 </span><span class="cov4" title="21">{
                                                         f.Mutex.RUnlock()
                                                         break</span>
                                                 }
                                                 <span class="cov0" title="0">f.Mutex.RUnlock()
-                                                f.Stats.Active--
+                                                f.Stats.AddActive(-1)
                                                 instance.remove(f)
                                                 n--</span>
                                         }
@@ -2193,6 +2141,12 @@ func (instance *pipelineRuntime) event(event runEvent) bool <span class="cov6" t
 
         <span class="cov6" title="92">return true</span> // represents a boolean ~ hasStateChanged?
 }
+
+func (instance *pipelineRuntime) getStatus() RunStatus <span class="cov6" title="104">{
+        instance.mutex.global.RLock()
+        defer instance.mutex.global.RUnlock()
+        return instance.Status
+}</span>
 
 func (instance *pipelineRuntime) IsAlive() bool <span class="cov7" title="202">{
 
@@ -2417,9 +2371,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) <span class="cov
                                 }
                         }
 
-                        <span class="cov3" title="10">function.Mutex.Lock()
-                        function.Stats.Active--
-                        function.Mutex.Unlock()
+                        <span class="cov3" title="10">function.Stats.AddActive(-1)
 
                         // if the number of producers is 0, the ET channel will close that
                         // allows the Transform goroutines to terminate once they have
@@ -2468,9 +2420,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) <span class="cov
                                                         break</span>
                                                 }
 
-                                                <span class="cov9" title="1070">function.From.Mutex.Lock()
-                                                function.From.Stats.Pulled++
-                                                function.From.Mutex.Unlock()
+                                                <span class="cov9" title="1070">function.From.Stats.IncPulled()
 
                                                 // associates a TimeOut to the data being removed from the channel and decrements
                                                 // the data counter for the current pipe
@@ -2497,9 +2447,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) <span class="cov
                                 <span class="cov9" title="1080">if closeChan </span><span class="cov3" title="10">{
 
                                         if terminationCause == Complete </span><span class="cov3" title="10">{
-                                                function.Mutex.Lock()
-                                                function.Stats.Active--
-                                                function.Mutex.Unlock()
+                                                function.Stats.AddActive(-1)
                                         }</span>
 
                                         // if we were waiting for the channel to close before transforming the data,
@@ -2561,9 +2509,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) <span class="cov
                                                 // the data counter for the current pipe
                                                 <span class="cov9" title="2070">function.From.Value.DataPopped(request.In)
 
-                                                function.From.Mutex.Lock()
-                                                function.From.Stats.Pulled++
-                                                function.From.Mutex.Unlock()
+                                                function.From.Stats.IncPulled()
 
                                                 // what: the developer has an option to wait for all the data to be received by a
                                                 // channel before processing that data.
@@ -2588,24 +2534,18 @@ func (instance *pipelineRuntime) provision(function *pFunction) <span class="cov
 
                                                                 <span class="cov9" title="2070">if isSliceExplosion </span><span class="cov0" title="0">{
                                                                         sliceLen := results[0].Len()
-                                                                        function.To.Mutex.Lock()
-                                                                        function.To.Stats.Pushed += uint64(sliceLen)
-                                                                        function.To.Mutex.Unlock()
+                                                                        function.To.Stats.IncPushed(uint64(sliceLen))
 
                                                                         for i := 0; i &lt; sliceLen; i++ </span><span class="cov0" title="0">{
                                                                                 function.To.Value.Push([]reflect.Value{results[0].Index(i)})
                                                                         }</span>
                                                                 } else<span class="cov9" title="2070"> {
-                                                                        function.To.Mutex.Lock()
-                                                                        function.To.Stats.Pushed++
-                                                                        function.To.Mutex.Unlock()
+                                                                        function.To.Stats.IncPushed(1)
 
                                                                         function.To.Value.Push(results)
                                                                 }</span>
                                                         } else<span class="cov0" title="0"> {
-                                                                function.From.Mutex.Lock()
-                                                                function.From.Stats.Dropped++
-                                                                function.From.Mutex.Unlock()
+                                                                function.From.Stats.IncDropped()
                                                         }</span>
                                                 }
                                         }
@@ -2619,9 +2559,7 @@ func (instance *pipelineRuntime) provision(function *pFunction) <span class="cov
                                 <span class="cov10" title="2081">if closeChan </span><span class="cov3" title="11">{
 
                                         if terminationCause == Complete </span><span class="cov3" title="11">{
-                                                function.Mutex.Lock()
-                                                function.Stats.Active--
-                                                function.Mutex.Unlock()
+                                                function.Stats.AddActive(-1)
                                         }</span>
 
                                         // if we were waiting for the channel to close before transforming the data,
@@ -2630,15 +2568,11 @@ func (instance *pipelineRuntime) provision(function *pFunction) <span class="cov
                                                 results, drop := supervisor.call(function, []reflect.Value{queuedRequests})
 
                                                 if !drop </span><span class="cov0" title="0">{
-                                                        function.To.Mutex.Lock()
-                                                        function.To.Stats.Pushed++
-                                                        function.To.Mutex.Unlock()
+                                                        function.To.Stats.IncPushed(1)
 
                                                         function.To.Value.Push(results)
                                                 }</span> else<span class="cov0" title="0"> {
-                                                        function.From.Mutex.Lock()
-                                                        function.From.Stats.Dropped++
-                                                        function.From.Mutex.Unlock()
+                                                        function.From.Stats.IncDropped()
                                                 }</span>
                                         }
                                         <span class="cov3" title="11">break</span>
@@ -2662,13 +2596,12 @@ func (instance *pipelineRuntime) provision(function *pFunction) <span class="cov
 // terminates a running instance of type pFunction.
 func (instance *pipelineRuntime) remove(function *pFunction) <span class="cov0" title="0">{
 
-        function.Mutex.Lock()
-        if function.Stats.Active &lt;= 0 </span><span class="cov0" title="0">{
-                function.Mutex.Unlock()
+        if function.Stats.GetActive() == 0 </span><span class="cov0" title="0">{
                 panic("attempting to quit when no functions are running")</span>
         }
 
-        <span class="cov0" title="0">quit := function.Quit[0]
+        <span class="cov0" title="0">function.Mutex.Lock()
+        quit := function.Quit[0]
         function.Quit = function.Quit[1:]
         function.Mutex.Unlock()
 
@@ -2718,9 +2651,7 @@ func (instance *pipelineRuntime) close() <span class="cov1" title="2">{
         if instance.testing </span><span class="cov0" title="0">{
                 var err error
                 for _, f := range instance.Pipeline.roots </span><span class="cov0" title="0">{
-                        f.Mutex.Lock()
-                        f.Stats.Active--
-                        f.Mutex.Unlock()
+                        f.Stats.AddActive(-1)
 
                         err = f.To.Value.ProducerDone()
                         if err != nil </span><span class="cov0" title="0">{
@@ -2741,7 +2672,7 @@ func (instance *pipelineRuntime) print() <span class="cov0" title="0">{
 }</span>
 </pre>
 		
-		<pre class="file" id="file10" style="display: none">// Package ScalingFunctions
+		<pre class="file" id="file9" style="display: none">// Package ScalingFunctions
 //
 // Copyright (c) 2024-2026. Gabriel Cordovado
 // All rights reserved.
@@ -2751,6 +2682,7 @@ package ScalingFunctions
 
 import (
         "fmt"
+        "sync/atomic"
         "time"
 )
 
@@ -2762,9 +2694,25 @@ type TimingStatistics struct {
 }
 
 type FunctionStatistic struct {
-        Active     uint16 `json:"active"`
+        Active     uint32 `json:"active"`
         Provisions uint64 `json:"provisions"`
 }
+
+func (s *FunctionStatistic) AddActive(delta int32) <span class="cov5" title="62">{
+        atomic.AddUint32(&amp;s.Active, uint32(delta))
+}</span>
+
+func (s *FunctionStatistic) GetActive() uint32 <span class="cov5" title="76">{
+        return atomic.LoadUint32(&amp;s.Active)
+}</span>
+
+func (s *FunctionStatistic) IncProvisions() <span class="cov4" title="31">{
+        atomic.AddUint64(&amp;s.Provisions, 1)
+}</span>
+
+func (s *FunctionStatistic) GetProvisions() uint64 <span class="cov5" title="55">{
+        return atomic.LoadUint64(&amp;s.Provisions)
+}</span>
 
 type PipeStatistic struct {
         Pushed   uint64
@@ -2773,6 +2721,38 @@ type PipeStatistic struct {
         Breaches uint64           `json:"breaches"`
         Timing   TimingStatistics `json:"timing"`
 }
+
+func (s *PipeStatistic) IncPushed(n uint64) <span class="cov9" title="2070">{
+        atomic.AddUint64(&amp;s.Pushed, n)
+}</span>
+
+func (s *PipeStatistic) GetPushed() uint64 <span class="cov5" title="41">{
+        return atomic.LoadUint64(&amp;s.Pushed)
+}</span>
+
+func (s *PipeStatistic) IncPulled() <span class="cov10" title="3140">{
+        atomic.AddUint64(&amp;s.Pulled, 1)
+}</span>
+
+func (s *PipeStatistic) GetPulled() uint64 <span class="cov5" title="41">{
+        return atomic.LoadUint64(&amp;s.Pulled)
+}</span>
+
+func (s *PipeStatistic) IncDropped() <span class="cov0" title="0">{
+        atomic.AddUint64(&amp;s.Dropped, 1)
+}</span>
+
+func (s *PipeStatistic) GetDropped() uint64 <span class="cov5" title="41">{
+        return atomic.LoadUint64(&amp;s.Dropped)
+}</span>
+
+func (s *PipeStatistic) IncBreaches() <span class="cov0" title="0">{
+        atomic.AddUint64(&amp;s.Breaches, 1)
+}</span>
+
+func (s *PipeStatistic) GetBreaches() uint64 <span class="cov5" title="41">{
+        return atomic.LoadUint64(&amp;s.Breaches)
+}</span>
 
 type Statistics struct {
         NumOfFunctions uint16              `json:"num_of_functions"`
@@ -2785,14 +2765,14 @@ type Statistics struct {
 // is a debug function used to view a snapshot of the Pipeline at an instance in time.
 func (s Statistics) Print() <span class="cov1" title="1">{
 
-        for idx, function := range s.Functions </span><span class="cov4" title="3">{
+        for idx, function := range s.Functions </span><span class="cov2" title="3">{
                 fmt.Printf("FunctionIR (%d):\n", idx)
-                fmt.Printf("\tActive: %d\n\tProvisioned: %d\n", function.Active, function.Provisions)
+                fmt.Printf("\tActive: %d\n\tProvisioned: %d\n", atomic.LoadUint32(&amp;function.Active), atomic.LoadUint64(&amp;function.Provisions))
         }</span>
 
-        <span class="cov1" title="1">for idx, pipe := range s.Pipes </span><span class="cov3" title="2">{
+        <span class="cov1" title="1">for idx, pipe := range s.Pipes </span><span class="cov1" title="2">{
                 fmt.Printf("Channel (%d):\n", idx)
-                fmt.Printf("\tPushed: %d\n\tPulled: %d\n\tDropped: %d\n\tBreaches: %d\n", pipe.Pushed, pipe.Pulled, pipe.Dropped, pipe.Breaches)
+                fmt.Printf("\tPushed: %d\n\tPulled: %d\n\tDropped: %d\n\tBreaches: %d\n", atomic.LoadUint64(&amp;pipe.Pushed), atomic.LoadUint64(&amp;pipe.Pulled), atomic.LoadUint64(&amp;pipe.Dropped), atomic.LoadUint64(&amp;pipe.Breaches))
                 fmt.Println("\tTiming:")
                 fmt.Printf("\t\tMin:%v\n\t\tMax:%v\n", pipe.Timing.MinTimeBeforePop, pipe.Timing.MaxTimeBeforePop)
         }</span>
@@ -2800,7 +2780,7 @@ func (s Statistics) Print() <span class="cov1" title="1">{
 
 // NewStatistics
 // is a constructor function to initialize memory for storing statistics.
-func NewStatistics(numOfFunctions, numOfPipes uint16) *Statistics <span class="cov10" title="14">{
+func NewStatistics(numOfFunctions, numOfPipes uint16) *Statistics <span class="cov4" title="28">{
         stats := new(Statistics)
 
         stats.NumOfFunctions = numOfFunctions
