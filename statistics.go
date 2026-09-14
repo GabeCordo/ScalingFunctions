@@ -1,3 +1,9 @@
+// Package ScalingFunctions
+//
+// Copyright (c) 2024-2026. Gabriel Cordovado
+// All rights reserved.
+//
+// Source file:  statistics.go
 package ScalingFunctions
 
 import (
